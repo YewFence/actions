@@ -8,7 +8,7 @@
 
 工作流文件在 `.github/workflows/rewrite-infisical-history.yml`。
 
-它每天自动运行一次，也可以在 GitHub Actions 页面手动触发。运行时会克隆 `github.com/infisical/infisical` 的 `main` 分支最近 100 个提交和对应 tags，安装 Rust 与 `filter-repo-rs`，从历史记录里移除整个 `docs` 目录，然后把重写后的分支和相关 tags 强制推送到你指定的目标远端。
+它每天自动运行一次，也可以在 GitHub Actions 页面手动触发。运行时会克隆 `github.com/infisical/infisical` 的 `main` 分支最近 100 个提交和对应 tags，安装 Rust 与 `filter-repo-rs`，从历史记录里移除整个 `docs` 和 `.github` 目录，然后把重写后的分支和相关 tags 强制推送到你指定的目标远端。
 
 ### 需要配置的变量
 
@@ -32,6 +32,6 @@
 
 目标分支会被 `git push --force` 覆盖。
 
-tags 只会推送当前浅克隆历史里能关联到 `HEAD` 祖先提交的 tags，并且也会使用强制推送。
+tags 只会推送当前浅克隆历史里能关联到 `HEAD` 祖先提交，并且名称符合 `vX.Y.Z` 格式的正式版本 tags，所以 nightly 之类的 tags 不会被推送，并且这些正式版本 tags 也会使用强制推送。
 
 如果目标远端里有重要内容，先确认目标分支和 tags 可以被覆盖。

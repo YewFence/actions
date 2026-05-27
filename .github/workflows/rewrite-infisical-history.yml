@@ -60,7 +60,7 @@ jobs:
         run: |
           set -euo pipefail
           cd source
-          mise exec -- filter-repo-rs --path docs --force --invert-paths
+          mise exec -- filter-repo-rs --path docs --path .github --force --invert-paths
 
       - name: Configure target remote
         run: |
@@ -89,6 +89,9 @@ jobs:
 
           tags=()
           while IFS= read -r tag; do
+            if [[ ! "$tag" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+              continue
+            fi
             commit="$(git rev-list -n 1 "${tag}^{commit}" 2>/dev/null || true)"
             if [[ -n "$commit" ]] && git merge-base --is-ancestor "$commit" HEAD 2>/dev/null; then
               tags+=("$tag")
