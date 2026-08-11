@@ -4,6 +4,10 @@
 
 这个仓库后续可能会继续加入别的零散自动化任务，所以每个工作流都会尽量独立配置，避免互相影响。
 
+## 设计文档
+
+- [声明式容器镜像编排器](docs/container-image-orchestrator.md)
+
 ## Rewrite Infisical History
 
 工作流文件在 `.github/workflows/rewrite-infisical-history.yml`。

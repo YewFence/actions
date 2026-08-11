@@ -1,0 +1,5 @@
+[[images]]
+name = "whoami"
+repository = "traefik/whoami"
+ref = "master"
+platforms = ["linux/amd64", "linux/arm64"]

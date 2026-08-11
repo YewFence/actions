@@ -1,0 +1,218 @@
+name: Build Container Images
+
+on:
+  schedule:
+    - cron: "23 3 * * *"
+  workflow_dispatch:
+    inputs:
+      name:
+        description: Image name (leave empty to build all images)
+        required: false
+        type: string
+  push:
+    branches:
+      - main
+    paths:
+      - images.toml
+      - scripts/render-image-matrix.py
+      - tests/test_render_image_matrix.py
+      - .github/workflows/build-images.yml
+  pull_request:
+    paths:
+      - images.toml
+      - scripts/render-image-matrix.py
+      - tests/test_render_image_matrix.py
+      - .github/workflows/build-images.yml
+
+concurrency:
+  group: build-container-images
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  check:
+    if: >-
+      github.event_name == 'pull_request' ||
+      github.ref == format('refs/heads/{0}', github.event.repository.default_branch)
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.matrix.outputs.matrix }}
+
+    steps:
+      - name: Check out orchestrator
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@d0cc045d04ccac9d8b7881df0226f9e82c39688e # v6.8.0
+        with:
+          enable-cache: false
+
+      - name: Test matrix renderer
+        run: uv run python -m unittest discover -s tests -v
+
+      - name: Render build matrix
+        id: matrix
+        env:
+          SELECTED_NAME: ${{ github.event.inputs.name || '' }}
+        run: |
+          set -euo pipefail
+          matrix="$(uv run python scripts/render-image-matrix.py --name "$SELECTED_NAME")"
+          printf 'matrix=%s\n' "$matrix" >> "$GITHUB_OUTPUT"
+
+          printf '## Image build plan\n\n' >> "$GITHUB_STEP_SUMMARY"
+          MATRIX="$matrix" uv run python - <<'PY' >> "$GITHUB_STEP_SUMMARY"
+          import json
+          import os
+
+          for image in json.loads(os.environ["MATRIX"])["include"]:
+              print(
+                  f"- `{image['name']}` from `{image['repository']}@{image['ref']}` "
+                  f"for `{image['platforms']}`"
+              )
+          PY
+
+  smoke-build:
+    if: github.event_name == 'pull_request'
+    needs: check
+    permissions:
+      contents: read
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    strategy:
+      fail-fast: false
+      max-parallel: 4
+      matrix: ${{ fromJSON(needs.check.outputs.matrix) }}
+    name: Smoke build ${{ matrix.name }}
+
+    steps:
+      - name: Check out upstream source
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          repository: ${{ matrix.repository }}
+          ref: ${{ matrix.ref }}
+          path: source
+          persist-credentials: false
+
+      - name: Record source commit
+        id: source
+        run: |
+          set -euo pipefail
+          commit="$(git -C source rev-parse HEAD)"
+          printf 'commit=%s\n' "$commit" >> "$GITHUB_OUTPUT"
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@c7c53464625b32c7a7e944ae62b3e17d2b600130 # v3.7.0
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3.12.0
+
+      - name: Smoke build image
+        uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6.19.2
+        env:
+          DOCKER_BUILD_RECORD_UPLOAD: "false"
+        with:
+          context: source/${{ matrix.context }}
+          file: source/${{ matrix.dockerfile }}
+          platforms: ${{ matrix.platforms }}
+          push: false
+          provenance: false
+
+      - name: Summarize smoke build
+        env:
+          IMAGE_NAME: ${{ matrix.name }}
+          SOURCE_REPOSITORY: ${{ matrix.repository }}
+          SOURCE_REF: ${{ matrix.ref }}
+          SOURCE_COMMIT: ${{ steps.source.outputs.commit }}
+          PLATFORMS: ${{ matrix.platforms }}
+        run: |
+          {
+            printf "## Smoke build passed\n\n"
+            printf -- "- Image: \`%s\`\n" "$IMAGE_NAME"
+            printf -- "- Source: \`%s@%s\`\n" "$SOURCE_REPOSITORY" "$SOURCE_REF"
+            printf -- "- Resolved commit: \`%s\`\n" "$SOURCE_COMMIT"
+            printf -- "- Platforms: \`%s\`\n" "$PLATFORMS"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  publish:
+    if: github.event_name != 'pull_request'
+    needs: check
+    permissions:
+      contents: read
+      packages: write
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    strategy:
+      fail-fast: false
+      max-parallel: 4
+      matrix: ${{ fromJSON(needs.check.outputs.matrix) }}
+    name: Publish ${{ matrix.name }}
+
+    steps:
+      - name: Check out upstream source
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          repository: ${{ matrix.repository }}
+          ref: ${{ matrix.ref }}
+          path: source
+          persist-credentials: false
+
+      - name: Record source metadata
+        id: source
+        run: |
+          set -euo pipefail
+          commit="$(git -C source rev-parse HEAD)"
+          created="$(date -u +'%Y-%m-%dT%H:%M:%SZ')"
+          printf 'commit=%s\n' "$commit" >> "$GITHUB_OUTPUT"
+          printf 'created=%s\n' "$created" >> "$GITHUB_OUTPUT"
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@c7c53464625b32c7a7e944ae62b3e17d2b600130 # v3.7.0
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3.12.0
+
+      - name: Log in to GHCR
+        uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3.7.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push image
+        id: build
+        uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6.19.2
+        with:
+          context: source/${{ matrix.context }}
+          file: source/${{ matrix.dockerfile }}
+          platforms: ${{ matrix.platforms }}
+          push: true
+          provenance: false
+          tags: ghcr.io/yewfence/${{ matrix.name }}:latest
+          labels: |
+            org.opencontainers.image.source=https://github.com/${{ matrix.repository }}
+            org.opencontainers.image.revision=${{ steps.source.outputs.commit }}
+            org.opencontainers.image.created=${{ steps.source.outputs.created }}
+          cache-from: type=gha,scope=${{ matrix.name }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.name }}
+
+      - name: Summarize published image
+        env:
+          IMAGE_NAME: ${{ matrix.name }}
+          SOURCE_REPOSITORY: ${{ matrix.repository }}
+          SOURCE_REF: ${{ matrix.ref }}
+          SOURCE_COMMIT: ${{ steps.source.outputs.commit }}
+          IMAGE_DIGEST: ${{ steps.build.outputs.digest }}
+        run: |
+          {
+            printf "## Published image\n\n"
+            printf -- "- Image: \`ghcr.io/yewfence/%s:latest\`\n" "$IMAGE_NAME"
+            printf -- "- Source: \`%s@%s\`\n" "$SOURCE_REPOSITORY" "$SOURCE_REF"
+            printf -- "- Resolved commit: \`%s\`\n" "$SOURCE_COMMIT"
+            printf -- "- Digest: \`%s\`\n" "$IMAGE_DIGEST"
+          } >> "$GITHUB_STEP_SUMMARY"
