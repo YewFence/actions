@@ -1,5 +1,5 @@
 [[images]]
-name = "whoami"
-repository = "traefik/whoami"
-ref = "master"
+name = "agent-vault"
+repository = "YewFence/agent-vault"
+ref = "main"
 platforms = ["linux/amd64", "linux/arm64"]
