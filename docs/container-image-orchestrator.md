@@ -59,14 +59,19 @@
 ```text
 .
 ├── images.toml
+├── mise.toml
 ├── scripts/
-│   └── render-image-matrix.py
+│   ├── render-image-matrix.py
+│   └── render-workflow-summary.py
+├── tests/
+│   ├── test_render_image_matrix.py
+│   └── test_render_workflow_summary.py
 └── .github/
     └── workflows/
         └── build-images.yml
 ```
 
-`render-image-matrix.py` 使用 Python 标准库 `tomllib`，尽量不引入第三方 Python 包。它同时承担配置校验和矩阵生成.
+`render-image-matrix.py` 使用 Python 标准库 `tomllib`，承担配置校验和矩阵生成；`render-workflow-summary.py` 将 matrix JSON 转换成 Markdown 构建计划。两者都通过 mise task 提供稳定入口，并由 `uv` 执行。
 
 ## 配置模型
 
@@ -132,10 +137,13 @@ platforms = ["linux/amd64"]
 `check` job 只需要 `contents: read`，负责：
 
 1. checkout 当前编排仓库。
-2. 解析并完整校验 `images.toml`。
-3. 按手动输入筛选一个已声明的镜像，或者选择全部镜像。
-4. 将标准化后的 matrix JSON 写入 job output。
-5. 在 job summary 中列出本次计划构建的镜像。
+2. 通过 `mise run test` 执行仓库测试。
+3. 通过 `image-render` task 解析并完整校验 `images.toml`。
+4. 按手动输入筛选一个已声明的镜像，或者选择全部镜像。
+5. 将标准化后的 matrix JSON 写入 job output。
+6. 通过 `image-plan-summary` task 生成 Markdown，并由 workflow 写入 job summary。
+
+matrix 校验和 Markdown 生成属于可移植逻辑，由 mise task 拥有；`GITHUB_OUTPUT` 与 `GITHUB_STEP_SUMMARY` 的写入仍由 workflow 负责。
 
 ### `smoke-build` matrix job
 
@@ -232,7 +240,7 @@ Buildx 使用 GitHub Actions cache，并以镜像名作为 cache scope，避免�
 - 重复名称、未知字段和空列表。
 - 非法仓库格式、路径穿越、非法平台和不存在的手动选择。
 
-测试只检查渲染器的公开接口：输入 TOML 与可选镜像名，输出 matrix JSON 或明确错误。不为 TOML 解析和 JSON 序列化建立额外 adapter。
+配置测试检查渲染器的公开接口：输入 TOML 与可选镜像名，输出 matrix JSON 或明确错误。不为 TOML 解析和 JSON 序列化建立额外 adapter。summary 测试使用代表性 matrix JSON 检查稳定的 Markdown 输出。
 
 ### 工作流
 

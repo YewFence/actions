@@ -15,8 +15,10 @@ on:
     paths:
       - mirrors.toml
       - scripts/render-mirror-matrix.py
+      - scripts/render-workflow-summary.py
       - scripts/mirror-default-branch.py
       - tests/test_render_mirror_matrix.py
+      - tests/test_render_workflow_summary.py
       - tests/test_mirror_default_branch.py
       - mise.toml
       - .github/workflows/mirror-repositories.yml
@@ -24,8 +26,10 @@ on:
     paths:
       - mirrors.toml
       - scripts/render-mirror-matrix.py
+      - scripts/render-workflow-summary.py
       - scripts/mirror-default-branch.py
       - tests/test_render_mirror_matrix.py
+      - tests/test_render_workflow_summary.py
       - tests/test_mirror_default_branch.py
       - mise.toml
       - .github/workflows/mirror-repositories.yml
@@ -69,14 +73,8 @@ jobs:
           matrix="$(mise run mirror-render -- --name "$SELECTED_NAME")"
           printf 'matrix=%s\n' "$matrix" >> "$GITHUB_OUTPUT"
 
-          printf '## Repository mirror plan\n\n' >> "$GITHUB_STEP_SUMMARY"
-          MATRIX="$matrix" uv run python - <<'PY' >> "$GITHUB_STEP_SUMMARY"
-          import json
-          import os
-
-          for mirror in json.loads(os.environ["MATRIX"])["include"]:
-              print(f"- `{mirror['name']}` from `{mirror['repository']}`")
-          PY
+          printf '%s' "$matrix" |
+            mise run --raw mirror-plan-summary >> "$GITHUB_STEP_SUMMARY"
 
   mirror:
     if: github.event_name != 'pull_request'
@@ -157,21 +155,9 @@ jobs:
           SOURCE_REPOSITORY: ${{ matrix.repository }}
           RESULT: ${{ steps.mirror.outputs.result }}
         run: |
-          uv run python - <<'PY' >> "$GITHUB_STEP_SUMMARY"
-          import json
-          import os
-
-          result = json.loads(os.environ["RESULT"])
-          print("## Repository mirror result\n")
-          print(f"- Mirror: `{os.environ['MIRROR_NAME']}`")
-          print(f"- Source: `{os.environ['SOURCE_REPOSITORY']}`")
-          print(f"- Operation: `{result['operation']}`")
-          print(f"- Default branch: `{result['source_branch']}`")
-          print(f"- Old commit: `{result['old_sha'] or 'none'}`")
-          print(f"- New commit: `{result['new_sha']}`")
-          for archive_ref in result["archive_refs"]:
-              print(f"- Archive: `{archive_ref}`")
-          PY
+          printf '%s' "$RESULT" |
+            mise run --raw mirror-result-summary \
+              "$MIRROR_NAME" "$SOURCE_REPOSITORY" >> "$GITHUB_STEP_SUMMARY"
 
       - name: Report archived history change
         if: steps.mirror.outputs.history_changed == 'true'

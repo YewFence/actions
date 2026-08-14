@@ -79,21 +79,26 @@ refs/heads/archive/heads/master/2026-08-15T12-30-00Z-<old-sha>
 
 ## 仓库结构
 
-计划新增以下文件：
+相关文件：
 
 ```text
 .
 ├── mirrors.toml
+├── mise.toml
 ├── scripts/
-│   └── render-mirror-matrix.py
+│   ├── mirror-default-branch.py
+│   ├── render-mirror-matrix.py
+│   └── render-workflow-summary.py
 ├── tests/
-│   └── test_render_mirror_matrix.py
+│   ├── test_mirror_default_branch.py
+│   ├── test_render_mirror_matrix.py
+│   └── test_render_workflow_summary.py
 └── .github/
     └── workflows/
         └── mirror-repositories.yml
 ```
 
-`mirrors.toml` 是维护者使用的唯一配置接口。渲染器使用 Python 标准库 `tomllib` 完成解析和校验，并输出 GitHub Actions 动态 matrix；Python 命令继续由仓库既有的 `uv` 运行。
+`mirrors.toml` 是维护者使用的唯一配置接口。matrix 渲染器使用 Python 标准库 `tomllib` 完成解析和校验，summary 渲染器将 matrix 或同步结果 JSON 转换成 Markdown；这些 Python 命令通过 mise task 提供稳定入口，并由 `uv` 执行。
 
 ## 配置模型
 
@@ -278,10 +283,10 @@ concurrency:
 `check` job：
 
 1. checkout 当前编排仓库。
-2. 使用 `uv run python` 执行渲染器测试。
-3. 解析和完整校验 `mirrors.toml`。
+2. 使用 `mise run test` 执行仓库测试。
+3. 通过 `mirror-render` task 解析和完整校验 `mirrors.toml`。
 4. 按手动输入筛选清单项并输出 matrix。
-5. 在 job summary 中列出来源 URL 和目标仓库名。
+5. 通过 `mirror-plan-summary` task 生成 Markdown，并由 workflow 写入 job summary。
 
 `mirror` matrix job：
 
@@ -292,6 +297,8 @@ concurrency:
 5. 读取目标默认分支和 commit。
 6. 按同步算法抓取、比较、归档和更新。
 7. 在 job summary 中记录来源、目标、默认分支、旧 SHA、新 SHA、归档引用和最终操作。
+
+matrix 校验和 Markdown 生成属于可移植逻辑，由 mise task 拥有；GitHub step output、job summary 与失败条件映射仍由 workflow 负责。
 
 `strategy.fail-fast` 设为 `false`，一个仓库失败不会取消其他仓库，但任意 matrix job 失败都会让整轮 workflow 显示失败。
 
@@ -328,6 +335,8 @@ concurrency:
 - 非 HTTPS URL、userinfo、query、fragment 和空路径。
 - 非法或重复的显式名称，以及两个 URL 解析成同一默认名称。
 - 未知字段、空清单和不存在的手动选择。
+
+summary 渲染测试使用代表性 matrix 与同步结果 JSON，覆盖计划列表、操作类型、默认分支、commit 和归档引用的 Markdown 输出。
 
 ### Git 同步逻辑
 

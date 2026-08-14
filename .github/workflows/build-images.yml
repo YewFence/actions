@@ -15,13 +15,19 @@ on:
     paths:
       - images.toml
       - scripts/render-image-matrix.py
+      - scripts/render-workflow-summary.py
       - tests/test_render_image_matrix.py
+      - tests/test_render_workflow_summary.py
+      - mise.toml
       - .github/workflows/build-images.yml
   pull_request:
     paths:
       - images.toml
       - scripts/render-image-matrix.py
+      - scripts/render-workflow-summary.py
       - tests/test_render_image_matrix.py
+      - tests/test_render_workflow_summary.py
+      - mise.toml
       - .github/workflows/build-images.yml
 
 concurrency:
@@ -52,7 +58,7 @@ jobs:
         uses: jdx/mise-action@3c2e0cf82a5b2e5249f0d3635a4d83d0ae861518 # v4.2.5
 
       - name: Test matrix renderer
-        run: uv run python -m unittest discover -s tests -v
+        run: mise run test
 
       - name: Render build matrix
         id: matrix
@@ -60,20 +66,11 @@ jobs:
           SELECTED_NAME: ${{ github.event.inputs.name || '' }}
         run: |
           set -euo pipefail
-          matrix="$(uv run python scripts/render-image-matrix.py --name "$SELECTED_NAME")"
+          matrix="$(mise run image-render -- --name "$SELECTED_NAME")"
           printf 'matrix=%s\n' "$matrix" >> "$GITHUB_OUTPUT"
 
-          printf '## Image build plan\n\n' >> "$GITHUB_STEP_SUMMARY"
-          MATRIX="$matrix" uv run python - <<'PY' >> "$GITHUB_STEP_SUMMARY"
-          import json
-          import os
-
-          for image in json.loads(os.environ["MATRIX"])["include"]:
-              print(
-                  f"- `{image['name']}` from `{image['repository']}@{image['ref']}` "
-                  f"for `{image['platforms']}`"
-              )
-          PY
+          printf '%s' "$matrix" |
+            mise run --raw image-plan-summary >> "$GITHUB_STEP_SUMMARY"
 
   smoke-build:
     if: github.event_name == 'pull_request'

@@ -8,9 +8,33 @@ uv = "latest"
 description = "Run all unit and local integration tests"
 run = "uv run python -m unittest discover -s tests -v"
 
+[tasks.image-render]
+description = "Validate images.toml and render the image matrix"
+run = "uv run python scripts/render-image-matrix.py"
+
+[tasks.image-plan-summary]
+description = "Read an image matrix from stdin and render its build plan"
+run = "uv run python scripts/render-workflow-summary.py image-plan"
+
 [tasks.mirror-render]
 description = "Validate mirrors.toml and render the mirror matrix"
 run = "uv run python scripts/render-mirror-matrix.py"
+
+[tasks.mirror-plan-summary]
+description = "Read a mirror matrix from stdin and render its sync plan"
+run = "uv run python scripts/render-workflow-summary.py mirror-plan"
+
+[tasks.mirror-result-summary]
+description = "Read a mirror result from stdin and render its summary"
+usage = '''
+arg "<name>" help="Mirror name"
+arg "<source>" help="Source repository URL"
+'''
+run = '''
+uv run python scripts/render-workflow-summary.py mirror-result \
+  --name "${usage_name?}" \
+  --source "${usage_source?}"
+'''
 
 [tasks.mirror-sync]
 description = "Mirror and archive one repository's default branch"
