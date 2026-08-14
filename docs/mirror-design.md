@@ -109,12 +109,14 @@ repository = "https://github.com/owner/example.git"
 [[mirrors]]
 repository = "https://codeberg.org/another/project.git"
 name = "project-backup"
+private = true
 ```
 
 | 字段 | 必填 | 含义 |
 | --- | --- | --- |
 | `repository` | 是 | 无需认证即可访问的 HTTPS Git 仓库 URL |
 | `name` | 否 | 目标 Forgejo 仓库名；默认取 `repository` 的仓库 basename |
+| `private` | 否 | 新建目标仓库是否设为 private；默认 `false`，即 public |
 
 配置校验规则：
 
@@ -122,6 +124,7 @@ name = "project-backup"
 - URL 不允许包含用户名、密码、查询参数或 fragment。
 - 仓库 basename 移除可选的 `.git` 后缀后必须非空。
 - `name` 必须满足 Forgejo 仓库名称约束，且不能包含 `/`。
+- `private` 必须是 TOML boolean，不能使用字符串；默认值为 `false`。
 - 解析出的目标仓库名必须唯一，防止两个同名上游默认写入同一个目标仓库。
 - 未知字段视为错误，避免拼写错误被静默忽略。
 - 清单不得声明 branch；默认分支始终从本轮上游 `HEAD` 解析。
@@ -129,7 +132,7 @@ name = "project-backup"
 渲染器输出 GitHub Actions 可直接传给 `fromJSON` 的紧凑 JSON：
 
 ```json
-{"include":[{"name":"example","repository":"https://github.com/owner/example.git"}]}
+{"include":[{"name":"example","repository":"https://github.com/owner/example.git","private":false}]}
 ```
 
 手动触发的 `name` 输入只能筛选已通过校验的清单项，不能替换来源 URL 或目标名称。
@@ -168,8 +171,10 @@ URL 中不得包含 token。Git 认证通过临时 `GIT_ASKPASS` 程序提供用
 每个 matrix job 使用 `fj repo view` 查询 `${FORGEJO_USERNAME}/${name}`。查询失败时执行：
 
 ```bash
-fj repo create "$name" --private --yes
+fj repo create "$name" --yes
 ```
+
+新仓库默认创建为 public；清单设置 `private = true` 时，创建命令追加 `--private`。可见性只在创建时应用，已经存在的仓库不会被工作流改成 public 或 private。
 
 `fj` 自动读取 `FORGEJO_HOST` 和 `FORGEJO_TOKEN`。创建成功后继续同步；创建失败时再次查询，以处理另一个任务刚好创建了同名仓库的竞争。第二次查询仍失败时，任务同时输出首次查询错误和创建错误并停止，不继续推送。这个流程不解析 `fj` 面向用户的错误文本，也不绕过 CLI 发出容易被 Cloudflare 单独拦截的裸 HTTP 请求。`fj` 由仓库现有的 `mise.toml` 管理，工作流安装时显式设置 `MISE_OFFLINE=0`。
 
@@ -319,7 +324,7 @@ matrix 校验和 Markdown 生成属于可移植逻辑，由 mise task 拥有；G
 - `FORGEJO_TOKEN` 不得作为命令行参数、URL、Git config 值、artifact、cache 或 job summary 的一部分。
 - 不启用 `fj --verbose`、`set -x` 或其他可能输出认证请求细节的调试模式。
 - 所有目标 ref 名都来自经过校验的默认分支和目标名称；在拼接 refspec 前仍使用 `git check-ref-format` 验证完整 ref。
-- 目标仓库默认创建为 private，工作流不自动修改已有仓库的可见性。
+- 目标仓库默认创建为 public，可通过清单设为 private；工作流不自动修改已有仓库的可见性。
 - 因为设计允许直接接管已有同名仓库，添加或修改清单项必须经过维护者审查；这是本方案明确接受的覆盖风险。
 
 ## 失败语义与可观测性
@@ -364,7 +369,7 @@ summary 渲染测试使用代表性 matrix 与同步结果 JSON，覆盖计划�
 
 本地开发环境没有可用于创建目标仓库的 Forgejo token，因此当前只依据帮助信息确认以下接口：
 
-- `fj repo create <REPO> --private --yes`
+- `fj repo create <REPO> [--private] --yes`
 - `fj --json repo view <OWNER/REPO>`
 - `fj repo units --repo <OWNER/REPO> actions --enable false`
 - `fj repo edit --repo <OWNER/REPO> --default-branch <BRANCH> --yes`

@@ -127,6 +127,7 @@ jobs:
         id: mirror
         env:
           MIRROR_NAME: ${{ matrix.name }}
+          MIRROR_VISIBILITY: ${{ matrix.private && 'private' || 'public' }}
           SOURCE_REPOSITORY: ${{ matrix.repository }}
         run: |
           set -euo pipefail
@@ -136,7 +137,8 @@ jobs:
             --source "$SOURCE_REPOSITORY" \
             --target "$target_url" \
             --target-repository "$target_repository" \
-            --target-name "$MIRROR_NAME")"
+            --target-name "$MIRROR_NAME" \
+            --visibility "$MIRROR_VISIBILITY")"
 
           RESULT="$result" uv run python - <<'PY'
           import json

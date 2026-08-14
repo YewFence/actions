@@ -30,7 +30,7 @@ class RenderMirrorMatrixTests(unittest.TestCase):
                 [[mirrors]]
                 repository = "https://example.com/owner/example.git"
             '''),
-            '{"include":[{"name":"example","repository":"https://example.com/owner/example.git"}]}',
+            '{"include":[{"name":"example","repository":"https://example.com/owner/example.git","private":false}]}',
         )
 
     def test_custom_name_and_selection(self) -> None:
@@ -41,10 +41,12 @@ class RenderMirrorMatrixTests(unittest.TestCase):
             [[mirrors]]
             repository = "https://example.com/owner/second.git"
             name = "backup.second"
+            private = true
         ''', "backup.second"))
         self.assertEqual(matrix["include"], [{
             "name": "backup.second",
             "repository": "https://example.com/owner/second.git",
+            "private": True,
         }])
 
     def test_rejects_unsafe_urls(self) -> None:
@@ -86,6 +88,13 @@ class RenderMirrorMatrixTests(unittest.TestCase):
                 [[mirrors]]
                 repository = "https://example.com/owner/repo.git"
             ''', "missing")
+
+    def test_rejects_non_boolean_private(self) -> None:
+        self.assert_config_error('''
+            [[mirrors]]
+            repository = "https://example.com/owner/repo.git"
+            private = "yes"
+        ''', "private must be a boolean")
 
 
 if __name__ == "__main__":

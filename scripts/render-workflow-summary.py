@@ -19,7 +19,10 @@ def render_image_plan(matrix: dict[str, Any]) -> str:
 def render_mirror_plan(matrix: dict[str, Any]) -> str:
     lines = ["## Repository mirror plan", ""]
     for mirror in matrix["include"]:
-        lines.append(f"- `{mirror['name']}` from `{mirror['repository']}`")
+        visibility = "private" if mirror["private"] else "public"
+        lines.append(
+            f"- `{mirror['name']}` from `{mirror['repository']}` ({visibility})"
+        )
     return "\n".join(lines)
 
 

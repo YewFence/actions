@@ -40,6 +40,7 @@ class RenderWorkflowSummaryTests(unittest.TestCase):
                     {
                         "name": "example",
                         "repository": "https://example.com/owner/example.git",
+                        "private": False,
                     }
                 ]
             }
@@ -48,7 +49,7 @@ class RenderWorkflowSummaryTests(unittest.TestCase):
         self.assertEqual(
             summary,
             "## Repository mirror plan\n\n"
-            "- `example` from `https://example.com/owner/example.git`",
+            "- `example` from `https://example.com/owner/example.git` (public)",
         )
 
     def test_renders_mirror_result(self) -> None:

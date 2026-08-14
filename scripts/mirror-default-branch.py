@@ -312,14 +312,18 @@ def disable_repository_actions(repository: str) -> str | None:
     return units_error
 
 
-def ensure_target_repository(repository: str, name: str) -> str | None:
+def ensure_target_repository(
+    repository: str, name: str, *, private: bool = False
+) -> str | None:
     view = _run(["fj", "--json", "repo", "view", repository], check=False)
     if view.returncode == 0:
         return disable_repository_actions(repository)
 
-    create = _run(
-        ["fj", "repo", "create", name, "--private", "--yes"], check=False
-    )
+    create_arguments = ["fj", "repo", "create", name]
+    if private:
+        create_arguments.append("--private")
+    create_arguments.append("--yes")
+    create = _run(create_arguments, check=False)
     if create.returncode == 0:
         return disable_repository_actions(repository)
 
@@ -343,11 +347,19 @@ def main() -> int:
         "--target-repository", required=True, help="Forgejo owner/repository identifier"
     )
     parser.add_argument("--target-name", required=True, help="Forgejo repository name")
+    parser.add_argument(
+        "--visibility",
+        choices=("public", "private"),
+        default="public",
+        help="visibility used when creating the target repository",
+    )
     arguments = parser.parse_args()
 
     try:
         setup_error = ensure_target_repository(
-            arguments.target_repository, arguments.target_name
+            arguments.target_repository,
+            arguments.target_name,
+            private=arguments.visibility == "private",
         )
 
         def set_default_branch(branch: str) -> None:

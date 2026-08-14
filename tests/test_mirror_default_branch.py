@@ -154,7 +154,7 @@ class MirrorDefaultBranchTests(unittest.TestCase):
             [
                 call(["fj", "--json", "repo", "view", "owner/repo"], check=False),
                 call(
-                    ["fj", "repo", "create", "repo", "--private", "--yes"],
+                    ["fj", "repo", "create", "repo", "--yes"],
                     check=False,
                 ),
                 call(
@@ -200,6 +200,24 @@ class MirrorDefaultBranchTests(unittest.TestCase):
                     check=False,
                 ),
             ],
+        )
+
+    def test_private_target_adds_private_create_flag(self) -> None:
+        missing = subprocess.CompletedProcess([], 1, "", "not found")
+        created = subprocess.CompletedProcess([], 0, "created", "")
+        units_disabled = subprocess.CompletedProcess([], 0, "", "")
+
+        with patch.object(
+            mirror, "_run", side_effect=[missing, created, units_disabled]
+        ) as run:
+            mirror.ensure_target_repository("owner/repo", "repo", private=True)
+
+        self.assertEqual(
+            run.call_args_list[1],
+            call(
+                ["fj", "repo", "create", "repo", "--private", "--yes"],
+                check=False,
+            ),
         )
 
     def test_units_failure_is_returned_without_blocking_sync(self) -> None:

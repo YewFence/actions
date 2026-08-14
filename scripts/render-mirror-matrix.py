@@ -10,7 +10,7 @@ from typing import Any
 from urllib.parse import urlsplit
 
 
-MIRROR_FIELDS = frozenset({"repository", "name"})
+MIRROR_FIELDS = frozenset({"repository", "name", "private"})
 NAME_PATTERN = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]*$")
 
 
@@ -26,7 +26,7 @@ def _require_string(field: str, value: Any, index: int) -> str:
     return value
 
 
-def _normalize_mirror(raw_mirror: Any, index: int) -> dict[str, str]:
+def _normalize_mirror(raw_mirror: Any, index: int) -> dict[str, str | bool]:
     if not isinstance(raw_mirror, dict):
         raise ConfigError(f"mirrors[{index}] must be a table")
 
@@ -59,7 +59,11 @@ def _normalize_mirror(raw_mirror: Any, index: int) -> dict[str, str]:
             "letters, numbers, dots, underscores, or hyphens"
         )
 
-    return {"name": name, "repository": repository}
+    private = raw_mirror.get("private", False)
+    if not isinstance(private, bool):
+        raise ConfigError(f"mirror {name!r}: private must be a boolean")
+
+    return {"name": name, "repository": repository, "private": private}
 
 
 def render_mirror_matrix(config_path: Path, selected_name: str | None = None) -> str:
