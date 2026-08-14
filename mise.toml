@@ -1,3 +1,5 @@
 [tools]
 pinact = "latest"
+python = "latest"
+uv = "latest"
 
