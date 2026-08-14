@@ -7,6 +7,7 @@
 ## 设计文档
 
 - [声明式容器镜像编排器](docs/container-image-orchestrator.md)
+- [Forgejo 默认分支镜像与历史归档](docs/mirror-design.md)
 
 ## Rewrite Infisical History
 

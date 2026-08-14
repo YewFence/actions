@@ -1,0 +1,182 @@
+name: Mirror Repositories
+
+on:
+  schedule:
+    - cron: "17 */6 * * *"
+  workflow_dispatch:
+    inputs:
+      name:
+        description: Mirror name (leave empty to sync all mirrors)
+        required: false
+        type: string
+  push:
+    branches:
+      - main
+    paths:
+      - mirrors.toml
+      - scripts/render-mirror-matrix.py
+      - scripts/mirror-default-branch.py
+      - tests/test_render_mirror_matrix.py
+      - tests/test_mirror_default_branch.py
+      - mise.toml
+      - .github/workflows/mirror-repositories.yml
+  pull_request:
+    paths:
+      - mirrors.toml
+      - scripts/render-mirror-matrix.py
+      - scripts/mirror-default-branch.py
+      - tests/test_render_mirror_matrix.py
+      - tests/test_mirror_default_branch.py
+      - mise.toml
+      - .github/workflows/mirror-repositories.yml
+
+concurrency:
+  group: mirror-repositories
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  check:
+    if: >-
+      github.event_name == 'pull_request' ||
+      github.ref == format('refs/heads/{0}', github.event.repository.default_branch)
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.matrix.outputs.matrix }}
+
+    steps:
+      - name: Check out orchestrator
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Set up mise
+        uses: jdx/mise-action@3c2e0cf82a5b2e5249f0d3635a4d83d0ae861518 # v4.2.5
+
+      - name: Test mirror implementation
+        run: mise run test
+
+      - name: Render mirror matrix
+        id: matrix
+        env:
+          SELECTED_NAME: ${{ github.event.inputs.name || '' }}
+        run: |
+          set -euo pipefail
+          matrix="$(mise run mirror-render -- --name "$SELECTED_NAME")"
+          printf 'matrix=%s\n' "$matrix" >> "$GITHUB_OUTPUT"
+
+          printf '## Repository mirror plan\n\n' >> "$GITHUB_STEP_SUMMARY"
+          MATRIX="$matrix" uv run python - <<'PY' >> "$GITHUB_STEP_SUMMARY"
+          import json
+          import os
+
+          for mirror in json.loads(os.environ["MATRIX"])["include"]:
+              print(f"- `{mirror['name']}` from `{mirror['repository']}`")
+          PY
+
+  mirror:
+    if: github.event_name != 'pull_request'
+    needs: check
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      max-parallel: 4
+      matrix: ${{ fromJSON(needs.check.outputs.matrix) }}
+    name: Mirror ${{ matrix.name }}
+    env:
+      FORGEJO_HOST: ${{ vars.FORGEJO_HOST || secrets.FORGEJO_HOST }}
+      FORGEJO_USERNAME: ${{ vars.FORGEJO_USERNAME || secrets.FORGEJO_USERNAME }}
+      FORGEJO_TOKEN: ${{ secrets.FORGEJO_TOKEN }}
+
+    steps:
+      - name: Check out orchestrator
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Set up mise
+        uses: jdx/mise-action@3c2e0cf82a5b2e5249f0d3635a4d83d0ae861518 # v4.2.5
+
+      - name: Configure Forgejo authentication
+        run: |
+          set -euo pipefail
+          : "${FORGEJO_HOST:?missing FORGEJO_HOST}"
+          : "${FORGEJO_USERNAME:?missing FORGEJO_USERNAME}"
+          : "${FORGEJO_TOKEN:?missing FORGEJO_TOKEN}"
+          host_without_scheme="${FORGEJO_HOST#https://}"
+          if [[ "$host_without_scheme" == "$FORGEJO_HOST" || "$host_without_scheme" == */* ]]; then
+            echo "FORGEJO_HOST must be an HTTPS instance root URL without a path" >&2
+            exit 1
+          fi
+
+          askpass="$RUNNER_TEMP/forgejo-askpass.sh"
+          # Expand credentials when askpass runs, not while creating it.
+          # shellcheck disable=SC2016
+          printf '%s\n' \
+            '#!/usr/bin/env bash' \
+            'case "$1" in' \
+            '  *Username*) printf "%s\\n" "$FORGEJO_USERNAME" ;;' \
+            '  *Password*) printf "%s\\n" "$FORGEJO_TOKEN" ;;' \
+            'esac' > "$askpass"
+          chmod 700 "$askpass"
+          printf 'GIT_ASKPASS=%s\n' "$askpass" >> "$GITHUB_ENV"
+          printf 'GIT_TERMINAL_PROMPT=0\n' >> "$GITHUB_ENV"
+
+      - name: Mirror default branch
+        id: mirror
+        env:
+          MIRROR_NAME: ${{ matrix.name }}
+          SOURCE_REPOSITORY: ${{ matrix.repository }}
+        run: |
+          set -euo pipefail
+          target_repository="${FORGEJO_USERNAME}/${MIRROR_NAME}"
+          target_url="${FORGEJO_HOST%/}/${target_repository}.git"
+          result="$(mise run mirror-sync -- \
+            --source "$SOURCE_REPOSITORY" \
+            --target "$target_url" \
+            --target-repository "$target_repository" \
+            --target-name "$MIRROR_NAME")"
+
+          RESULT="$result" uv run python - <<'PY'
+          import json
+          import os
+
+          result = json.loads(os.environ["RESULT"])
+          with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as output:
+              print(f"result={json.dumps(result, separators=(',', ':'))}", file=output)
+              print(f"operation={result['operation']}", file=output)
+              print(f"history_changed={str(result['history_changed']).lower()}", file=output)
+          PY
+
+      - name: Summarize mirror result
+        env:
+          MIRROR_NAME: ${{ matrix.name }}
+          SOURCE_REPOSITORY: ${{ matrix.repository }}
+          RESULT: ${{ steps.mirror.outputs.result }}
+        run: |
+          uv run python - <<'PY' >> "$GITHUB_STEP_SUMMARY"
+          import json
+          import os
+
+          result = json.loads(os.environ["RESULT"])
+          print("## Repository mirror result\n")
+          print(f"- Mirror: `{os.environ['MIRROR_NAME']}`")
+          print(f"- Source: `{os.environ['SOURCE_REPOSITORY']}`")
+          print(f"- Operation: `{result['operation']}`")
+          print(f"- Default branch: `{result['source_branch']}`")
+          print(f"- Old commit: `{result['old_sha'] or 'none'}`")
+          print(f"- New commit: `{result['new_sha']}`")
+          for archive_ref in result["archive_refs"]:
+              print(f"- Archive: `{archive_ref}`")
+          PY
+
+      - name: Report archived history change
+        if: steps.mirror.outputs.history_changed == 'true'
+        env:
+          OPERATION: ${{ steps.mirror.outputs.operation }}
+        run: |
+          printf 'Default branch history changed: %s\n' "$OPERATION" >&2
+          exit 1
