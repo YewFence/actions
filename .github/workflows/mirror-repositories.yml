@@ -147,6 +147,7 @@ jobs:
               print(f"result={json.dumps(result, separators=(',', ':'))}", file=output)
               print(f"operation={result['operation']}", file=output)
               print(f"history_changed={str(result['history_changed']).lower()}", file=output)
+              print(f"setup_failed={str(result['setup_error'] is not None).lower()}", file=output)
           PY
 
       - name: Summarize mirror result
@@ -159,10 +160,19 @@ jobs:
             mise run --raw mirror-result-summary \
               "$MIRROR_NAME" "$SOURCE_REPOSITORY" >> "$GITHUB_STEP_SUMMARY"
 
-      - name: Report archived history change
-        if: steps.mirror.outputs.history_changed == 'true'
+      - name: Report mirror warning as failure
+        if: >-
+          steps.mirror.outputs.history_changed == 'true' ||
+          steps.mirror.outputs.setup_failed == 'true'
         env:
           OPERATION: ${{ steps.mirror.outputs.operation }}
+          HISTORY_CHANGED: ${{ steps.mirror.outputs.history_changed }}
+          SETUP_FAILED: ${{ steps.mirror.outputs.setup_failed }}
         run: |
-          printf 'Default branch history changed: %s\n' "$OPERATION" >&2
+          if [[ "$HISTORY_CHANGED" == "true" ]]; then
+            printf 'Default branch history changed: %s\n' "$OPERATION" >&2
+          fi
+          if [[ "$SETUP_FAILED" == "true" ]]; then
+            printf 'Repository was mirrored, but Forgejo Actions could not be disabled\n' >&2
+          fi
           exit 1

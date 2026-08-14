@@ -59,6 +59,7 @@ class RenderWorkflowSummaryTests(unittest.TestCase):
                 "old_sha": None,
                 "new_sha": "2222222",
                 "archive_refs": ["refs/archive/main/1111111"],
+                "setup_error": "units denied",
             },
             "example",
             "https://example.com/owner/example.git",
@@ -73,6 +74,7 @@ class RenderWorkflowSummaryTests(unittest.TestCase):
             "- Default branch: `main`\n"
             "- Old commit: `none`\n"
             "- New commit: `2222222`\n"
+            "- Repository setup error: `units denied`\n"
             "- Archive: `refs/archive/main/1111111`",
         )
 

@@ -173,6 +173,14 @@ fj repo create "$name" --private --yes
 
 `fj` 自动读取 `FORGEJO_HOST` 和 `FORGEJO_TOKEN`。创建成功后继续同步；创建失败时再次查询，以处理另一个任务刚好创建了同名仓库的竞争。第二次查询仍失败时，任务同时输出首次查询错误和创建错误并停止，不继续推送。这个流程不解析 `fj` 面向用户的错误文本，也不绕过 CLI 发出容易被 Cloudflare 单独拦截的裸 HTTP 请求。`fj` 由仓库现有的 `mise.toml` 管理，工作流安装时显式设置 `MISE_OFFLINE=0`。
 
+每轮同步在确认目标仓库存在后、推送 Git refs 前，都使用明确目标关闭该仓库的 Forgejo Actions unit：
+
+```bash
+fj repo units --repo "${FORGEJO_USERNAME}/${name}" actions --enable false
+```
+
+关闭 unit 是 best-effort 操作：无论仓库是本轮创建、之前已经存在，还是被并发任务创建，都会执行；失败时记录错误并继续完成 Git 同步，避免仓库已经创建却没有任何备份内容。同步结果和关闭错误仍会写入 `GITHUB_OUTPUT` 与 job summary，最后将 job 标记为失败。每轮重复关闭可以修复被人工重新启用或此前关闭失败的状态，并降低镜像上游工作流被目标 Forgejo 执行的风险。
+
 ### 修改默认分支
 
 `fj` 已提供设置目标仓库默认分支的命令：
@@ -319,6 +327,7 @@ matrix 校验和 Markdown 生成属于可移植逻辑，由 mise task 拥有；G
 - 上游或目标的引用发现失败时不修改目标仓库。
 - 归档失败时不更新当前默认分支。
 - 非 fast-forward 更新和默认分支变更都会在 summary 中突出显示，并将完整变化结果写入 `GITHUB_OUTPUT`；即使归档和同步成功，job 也以失败状态结束，从而以 GitHub Actions 失败通知作为唯一告警渠道。
+- 新建仓库的 Actions unit 关闭失败时继续同步；同步成功后仍以失败状态结束，并在结构化结果中保留失败原因。
 - 普通 fast-forward、首次创建和无变化同步正常成功。
 - 日志至少包含目标仓库名、变化类型、分支名和缩短后的 SHA；summary 可以记录完整 SHA 和归档引用，但不能包含认证 URL。
 - 工作流不主动重试有写入副作用的步骤；失败后由下一次定时任务或人工 `workflow_dispatch` 重新读取实际远端状态并恢复。
@@ -357,6 +366,7 @@ summary 渲染测试使用代表性 matrix 与同步结果 JSON，覆盖计划�
 
 - `fj repo create <REPO> --private --yes`
 - `fj --json repo view <OWNER/REPO>`
+- `fj repo units --repo <OWNER/REPO> actions --enable false`
 - `fj repo edit --repo <OWNER/REPO> --default-branch <BRANCH> --yes`
 - `FORGEJO_HOST` 和 `FORGEJO_TOKEN` 环境变量
 

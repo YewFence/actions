@@ -142,9 +142,12 @@ class MirrorDefaultBranchTests(unittest.TestCase):
     def test_missing_target_is_created_with_fj(self) -> None:
         missing = subprocess.CompletedProcess([], 1, "", "not found")
         created = subprocess.CompletedProcess([], 0, "created", "")
+        units_disabled = subprocess.CompletedProcess([], 0, "", "")
 
-        with patch.object(mirror, "_run", side_effect=[missing, created]) as run:
-            mirror.ensure_target_repository("owner/repo", "repo")
+        with patch.object(
+            mirror, "_run", side_effect=[missing, created, units_disabled]
+        ) as run:
+            self.assertIsNone(mirror.ensure_target_repository("owner/repo", "repo"))
 
         self.assertEqual(
             run.call_args_list,
@@ -154,15 +157,72 @@ class MirrorDefaultBranchTests(unittest.TestCase):
                     ["fj", "repo", "create", "repo", "--private", "--yes"],
                     check=False,
                 ),
+                call(
+                    [
+                        "fj",
+                        "repo",
+                        "units",
+                        "--repo",
+                        "owner/repo",
+                        "actions",
+                        "--enable",
+                        "false",
+                    ],
+                    check=False,
+                ),
             ],
         )
+
+    def test_existing_target_has_actions_disabled(self) -> None:
+        found = subprocess.CompletedProcess([], 0, "{}", "")
+        units_disabled = subprocess.CompletedProcess([], 0, "", "")
+
+        with patch.object(
+            mirror, "_run", side_effect=[found, units_disabled]
+        ) as run:
+            self.assertIsNone(mirror.ensure_target_repository("owner/repo", "repo"))
+
+        self.assertEqual(
+            run.call_args_list,
+            [
+                call(["fj", "--json", "repo", "view", "owner/repo"], check=False),
+                call(
+                    [
+                        "fj",
+                        "repo",
+                        "units",
+                        "--repo",
+                        "owner/repo",
+                        "actions",
+                        "--enable",
+                        "false",
+                    ],
+                    check=False,
+                ),
+            ],
+        )
+
+    def test_units_failure_is_returned_without_blocking_sync(self) -> None:
+        missing = subprocess.CompletedProcess([], 1, "", "not found")
+        created = subprocess.CompletedProcess([], 0, "created", "")
+        units_failed = subprocess.CompletedProcess([], 1, "", "units denied")
+
+        with patch.object(
+            mirror, "_run", side_effect=[missing, created, units_failed]
+        ), patch("sys.stderr"):
+            error = mirror.ensure_target_repository("owner/repo", "repo")
+
+        self.assertEqual(error, "units denied")
 
     def test_failed_create_rechecks_repository_before_failing(self) -> None:
         missing = subprocess.CompletedProcess([], 1, "", "not found")
         conflict = subprocess.CompletedProcess([], 1, "", "already exists")
         found = subprocess.CompletedProcess([], 0, "{}", "")
+        units_disabled = subprocess.CompletedProcess([], 0, "", "")
 
-        with patch.object(mirror, "_run", side_effect=[missing, conflict, found]):
+        with patch.object(
+            mirror, "_run", side_effect=[missing, conflict, found, units_disabled]
+        ):
             mirror.ensure_target_repository("owner/repo", "repo")
 
     def test_query_and_create_errors_are_both_reported(self) -> None:

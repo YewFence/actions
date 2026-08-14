@@ -36,6 +36,8 @@ def render_mirror_result(
         f"- Old commit: `{result['old_sha'] or 'none'}`",
         f"- New commit: `{result['new_sha']}`",
     ]
+    if result.get("setup_error") is not None:
+        lines.append(f"- Repository setup error: `{result['setup_error']}`")
     lines.extend(
         f"- Archive: `{archive_ref}`" for archive_ref in result["archive_refs"]
     )

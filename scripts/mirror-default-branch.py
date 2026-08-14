@@ -34,6 +34,7 @@ class SyncResult:
     new_sha: str
     archive_refs: list[str]
     history_changed: bool
+    setup_error: str | None = None
 
 
 def _run(
@@ -287,20 +288,44 @@ def sync_repository(
         )
 
 
-def ensure_target_repository(repository: str, name: str) -> None:
+def disable_repository_actions(repository: str) -> str | None:
+    units = _run(
+        [
+            "fj",
+            "repo",
+            "units",
+            "--repo",
+            repository,
+            "actions",
+            "--enable",
+            "false",
+        ],
+        check=False,
+    )
+    if units.returncode == 0:
+        return None
+    units_error = units.stderr.strip() or units.stdout.strip() or "command failed"
+    print(
+        f"warning: unable to disable Forgejo Actions for {repository}: {units_error}",
+        file=sys.stderr,
+    )
+    return units_error
+
+
+def ensure_target_repository(repository: str, name: str) -> str | None:
     view = _run(["fj", "--json", "repo", "view", repository], check=False)
     if view.returncode == 0:
-        return
+        return disable_repository_actions(repository)
 
     create = _run(
         ["fj", "repo", "create", name, "--private", "--yes"], check=False
     )
     if create.returncode == 0:
-        return
+        return disable_repository_actions(repository)
 
     retry = _run(["fj", "--json", "repo", "view", repository], check=False)
     if retry.returncode == 0:
-        return
+        return disable_repository_actions(repository)
 
     view_error = view.stderr.strip() or view.stdout.strip() or "query failed"
     create_error = create.stderr.strip() or create.stdout.strip() or "creation failed"
@@ -321,7 +346,9 @@ def main() -> int:
     arguments = parser.parse_args()
 
     try:
-        ensure_target_repository(arguments.target_repository, arguments.target_name)
+        setup_error = ensure_target_repository(
+            arguments.target_repository, arguments.target_name
+        )
 
         def set_default_branch(branch: str) -> None:
             _run(
@@ -338,6 +365,7 @@ def main() -> int:
             )
 
         result = sync_repository(arguments.source, arguments.target, set_default_branch)
+        result.setup_error = setup_error
         print(json.dumps(asdict(result), separators=(",", ":")))
     except MirrorError as error:
         print(f"error: {error}", file=sys.stderr)
