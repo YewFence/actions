@@ -1,8 +1,6 @@
 name: Build Container Images
 
 on:
-  schedule:
-    - cron: "23 3 * * *"
   workflow_dispatch:
     inputs:
       name:
