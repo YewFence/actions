@@ -1,5 +1,0 @@
-[[images]]
-name = "agent-vault"
-repository = "YewFence/agent-vault"
-ref = "main"
-platforms = ["linux/amd64", "linux/arm64"]

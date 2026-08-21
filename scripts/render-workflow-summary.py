@@ -6,16 +6,6 @@ import sys
 from typing import Any
 
 
-def render_image_plan(matrix: dict[str, Any]) -> str:
-    lines = ["## Image build plan", ""]
-    for image in matrix["include"]:
-        lines.append(
-            f"- `{image['name']}` from `{image['repository']}@{image['ref']}` "
-            f"for `{image['platforms']}`"
-        )
-    return "\n".join(lines)
-
-
 def render_mirror_plan(matrix: dict[str, Any]) -> str:
     lines = ["## Repository mirror plan", ""]
     for mirror in matrix["include"]:
@@ -48,9 +38,8 @@ def render_mirror_result(
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="Render portable workflow summaries")
+    parser = argparse.ArgumentParser(description="Render repository mirror summaries")
     subparsers = parser.add_subparsers(dest="summary", required=True)
-    subparsers.add_parser("image-plan", help="render an image build plan")
     subparsers.add_parser("mirror-plan", help="render a repository mirror plan")
     mirror_result_parser = subparsers.add_parser(
         "mirror-result", help="render a repository mirror result"
@@ -62,9 +51,7 @@ def main() -> int:
     arguments = parser.parse_args()
     payload = json.load(sys.stdin)
 
-    if arguments.summary == "image-plan":
-        summary = render_image_plan(payload)
-    elif arguments.summary == "mirror-plan":
+    if arguments.summary == "mirror-plan":
         summary = render_mirror_plan(payload)
     else:
         summary = render_mirror_result(payload, arguments.name, arguments.source)

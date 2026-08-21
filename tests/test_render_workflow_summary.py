@@ -12,26 +12,6 @@ SPEC.loader.exec_module(render_workflow_summary)
 
 
 class RenderWorkflowSummaryTests(unittest.TestCase):
-    def test_renders_image_plan(self) -> None:
-        summary = render_workflow_summary.render_image_plan(
-            {
-                "include": [
-                    {
-                        "name": "example",
-                        "repository": "owner/example",
-                        "ref": "main",
-                        "platforms": "linux/amd64,linux/arm64",
-                    }
-                ]
-            }
-        )
-
-        self.assertEqual(
-            summary,
-            "## Image build plan\n\n"
-            "- `example` from `owner/example@main` for `linux/amd64,linux/arm64`",
-        )
-
     def test_renders_mirror_plan(self) -> None:
         summary = render_workflow_summary.render_mirror_plan(
             {
