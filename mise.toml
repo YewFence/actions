@@ -5,6 +5,15 @@ python = "latest"
 ruff = "latest"
 uv = "latest"
 
+[tasks.check]
+description = "Run all code quality checks"
+depends = ["lint", "test"]
+alias = "c"
+
+[tasks.lint]
+description = "Run ruff check"
+run = "ruff check ."
+
 [tasks.test]
 description = "Run all unit and local integration tests"
 run = "uv run python -m unittest discover -s tests -v"
