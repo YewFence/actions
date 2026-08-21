@@ -235,6 +235,7 @@ Buildx 使用 GitHub Actions cache，并以镜像名作为 cache scope，避免�
 - 新 package 首次发布后，由维护者在 GHCR 设置中将其切换为 public。
 - 如果同名 package 已存在，需要确保当前仓库拥有该 package 的 Actions 写权限。
 - 镜像页面应明确说明它是自动构建的非官方镜像，并链接上游仓库和许可证。
+- 每轮发布成功后，清理 job 只删除没有标签的旧容器版本，并保留最近两个，避免 `latest` 更新后旧 manifest 无限积压。
 - 删除或重命名清单项不会自动删除 GHCR 中已有的 package，是可以接受的取舍。
 
 ## 失败语义与可观测性
@@ -301,7 +302,6 @@ Bake 很适合复杂的本地构建图，但其 HCL/JSON/Compose 配置会把 Bu
 - Buildx target、受控 build args 和 BuildKit secrets。
 - 针对单个镜像的构建周期。
 - 构建成功后的健康检查或容器 smoke test。
-- GHCR 旧 manifest 清理。
 - 需要补丁的 fork 通过可复用工作流接入。
 
 ## 参考资料
