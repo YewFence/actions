@@ -60,6 +60,7 @@ jobs:
 
       - name: Set up Infisical secrets
         if: github.event_name != 'pull_request'
+        continue-on-error: true
         uses: Infisical/secrets-action@77ab1f4ccd183a543cb5b42435fbd181189f4995 # v1.0.16
         with:
           method: "oidc"
@@ -167,6 +168,7 @@ jobs:
           persist-credentials: false
 
       - name: Set up Infisical secrets
+        continue-on-error: true
         uses: Infisical/secrets-action@77ab1f4ccd183a543cb5b42435fbd181189f4995 # v1.0.16
         with:
           method: "oidc"

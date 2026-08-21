@@ -115,6 +115,8 @@ password = "github-token"
 
 `IMAGES_TOML` 的内容必须是包含 `[[images]]` 表的 TOML。按 `name` 合并：同名项由环境变量中的字段覆盖仓库文件中的字段，环境变量中新增的镜像追加到列表。合并后仍执行全部校验。凭据不会写入 matrix JSON、job output、构建参数或 job summary；发布 job 只在 runner 内读取当前镜像的凭据，并将 `password` 作为 GitHub checkout token 使用。
 
+Infisical OIDC action 使用 `continue-on-error: true`。如果 Infisical 不可用，工作流会继续使用公开的 `images.toml`，跳过本次未能合并的私有镜像，不让整轮公开镜像构建失败；这意味着私有镜像需要在下一次 Infisical 恢复后再发布。
+
 首版校验规则：
 
 - `name` 必须唯一、全小写，并符合 GHCR package 名允许的字符范围。
