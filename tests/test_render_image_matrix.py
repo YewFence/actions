@@ -18,6 +18,15 @@ SPEC.loader.exec_module(render_image_matrix)
 
 
 class RenderImageMatrixTests(unittest.TestCase):
+    def setUp(self) -> None:
+        self._inherited_images_toml = os.environ.pop("IMAGES_TOML", None)
+
+    def tearDown(self) -> None:
+        if self._inherited_images_toml is None:
+            os.environ.pop("IMAGES_TOML", None)
+        else:
+            os.environ["IMAGES_TOML"] = self._inherited_images_toml
+
     def render(
         self,
         config: str,
