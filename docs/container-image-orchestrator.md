@@ -9,12 +9,12 @@
 
 ## 背景
 
-本设计在当前仓库中建立一个集中式编排层。镜像清单声明公开上游仓库及其构建参数，单个定时工作流读取清单、生成构建矩阵，并将构建结果统一发布到公开的 GHCR 命名空间。
+本设计在当前仓库中建立一个集中式编排层。镜像清单声明公开或私有的 GitHub 上游仓库及其构建参数，单个定时工作流读取清单、生成构建矩阵，并将构建结果统一发布到公开的 GHCR 命名空间。
 
 ## 目标
 
 - 通过修改一份声明式清单来增加、修改或停用镜像，不为每个镜像复制工作流。
-- 从公开 GitHub 仓库构建镜像，并发布为 `ghcr.io/yewfence/<name>:latest`。
+- 从公开或私有的 GitHub 仓库构建镜像，并发布为 `ghcr.io/yewfence/<name>:latest`。
 - 支持定时构建、手动构建和配置变更后的构建。
 - 支持单架构和常见的多架构镜像。
 - 将每个镜像放在独立 job 中构建，使失败和日志彼此隔离。
@@ -26,7 +26,6 @@
 - 不监听上游仓库事件；上游更新通过下一次定时构建被拉取。
 - 不发现或同步上游 release、Git tag 和语义化版本。
 - 不发布除 `latest` 之外的版本标签。
-- 不支持私有源码仓库或 GHCR 之外的注册表。
 - 不自动修改 GHCR package 的可见性或权限。
 - 不自动清理旧 manifest、无标签镜像或 Actions cache。
 - 不接受任意用户提交的仓库 URL、Dockerfile 路径或构建参数。
@@ -42,7 +41,7 @@
 
 ### `images.toml` 是唯一配置接口
 
-镜像维护者只需要理解 `images.toml`。TOML 解析、校验、矩阵 JSON、GitHub Actions 表达式、Buildx 参数和 GHCR 登录都属于编排器的实现，不暴露为每个镜像都要维护的配置。
+镜像维护者只需要理解 `images.toml`。TOML 解析、校验、矩阵 JSON、GitHub Actions 表达式、Buildx 参数和 GHCR 登录都属于编排器的实现，不暴露为每个镜像都要维护的配置。公开仓库中的 `images.toml` 保存非敏感镜像声明；需要私有源凭据时，通过 Infisical OIDC action 将同格式 TOML 放入 `IMAGES_TOML` 环境变量，工作流在 runner 内合并两者。
 
 首版接口保持克制：只有出现真实构建需求时才增加 build args、Buildx target、构建 secret 或自定义标签等字段。删除编排器后，这些逻辑会重新散落到每个镜像的工作流中，因此集中模块能够提供实际的复用价值和维护局部性。
 
@@ -91,6 +90,14 @@ ref = "main"
 context = "docker"
 dockerfile = "docker/Dockerfile"
 platforms = ["linux/amd64"]
+
+# 该段通常放在加密的 IMAGES_TOML 中，不要提交到仓库。
+[[images]]
+name = "private-example"
+repository = "owner/private-example"
+ref = "main"
+username = "github-user"
+password = "github-token"
 ```
 
 字段语义：
@@ -98,11 +105,15 @@ platforms = ["linux/amd64"]
 | 字段 | 必填 | 含义 |
 | --- | --- | --- |
 | `name` | 是 | GHCR 中的 package 名，也是手动构建时的选择标识 |
-| `repository` | 是 | 不含协议和主机名的公开 GitHub 仓库，格式为 `owner/repository` |
+| `repository` | 是 | 不含协议和主机名的 GitHub 仓库，格式为 `owner/repository`；公开或私有均可 |
 | `ref` | 是 | 要构建的 branch、tag 或完整 commit SHA |
 | `context` | 否 | 相对于上游仓库根目录的构建上下文，默认 `.` |
 | `dockerfile` | 否 | 相对于上游仓库根目录的 Dockerfile，默认 `Dockerfile` |
 | `platforms` | 否 | Buildx 目标平台，默认 `["linux/amd64"]` |
+| `username` | 否 | 访问私有 GitHub 源码仓库的用户名；必须与 `password` 同时出现 |
+| `password` | 否 | 访问私有 GitHub 源码仓库的密码或 token；必须与 `username` 同时出现 |
+
+`IMAGES_TOML` 的内容必须是包含 `[[images]]` 表的 TOML。按 `name` 合并：同名项由环境变量中的字段覆盖仓库文件中的字段，环境变量中新增的镜像追加到列表。合并后仍执行全部校验。凭据不会写入 matrix JSON、job output、构建参数或 job summary；发布 job 只在 runner 内读取当前镜像的凭据，并将 `password` 作为 GitHub checkout token 使用。
 
 首版校验规则：
 
@@ -169,7 +180,7 @@ matrix 校验和 Markdown 生成属于可移植逻辑，由 mise task 拥有；`
 6. 写入上游仓库、上游 commit、构建时间等 OCI 标签。
 7. 在 job summary 中记录镜像名称、上游 commit 和发布 digest。
 
-job 权限固定为：
+发布 job 的基础权限为：
 
 ```yaml
 permissions:
@@ -177,7 +188,9 @@ permissions:
   packages: write
 ```
 
-所有 `uses:` 必须固定到完整 commit SHA，并通过仓库已有的 `pinact` 维护更新。首版不生成 artifact attestation，因此不申请 `attestations: write` 或 `id-token: write`。
+需要从 Infisical 读取 `IMAGES_TOML` 的 `check` 和 `publish` job 额外申请 `id-token: write`；PR 不执行 Infisical action。
+
+固定版本的 Actions 通过仓库已有的 `pinact` 维护更新。首版不生成 artifact attestation，因此不申请 `attestations: write`。
 
 ### 缓存与并发
 
@@ -189,7 +202,7 @@ Buildx 使用 GitHub Actions cache，并以镜像名作为 cache scope，避免�
 
 ### 信任内容
 
-- 默认分支中的 `images.toml`、渲染脚本和工作流是受信任的发布配置。
+- 默认分支中的 `images.toml`、渲染脚本和工作流是受信任的发布配置；Infisical 中的 `IMAGES_TOML` 是受保护的发布输入。
 - 清单明确列出的仓库和 ref 被允许作为 Docker 构建输入。
 - 固定到完整 SHA 的 GitHub Actions 被允许在 runner 上执行。
 
@@ -202,9 +215,10 @@ Buildx 使用 GitHub Actions cache，并以镜像名作为 cache scope，避免�
 ### 强制约束
 
 - PR 事件绝不进入拥有 `packages: write` 的 job，也不执行 GHCR 登录步骤。
+- PR 事件不读取 Infisical，因此不会把私有配置或凭据暴露给不受信任的 PR。
 - PR 冒烟构建不配置 `type=gha` cache，无法写入或污染发布 job 使用的持久缓存。
 - 手动输入只用于筛选已有 `name`，不能覆盖仓库、ref、路径、平台或目标镜像。
-- 不把 `GITHUB_TOKEN`、Docker 配置、Actions context 或其他凭据作为 build arg、BuildKit secret、文件或环境变量传入 Dockerfile。
+- 不把 `GITHUB_TOKEN`、源仓库密码、Docker 配置、Actions context 或其他凭据作为 build arg、BuildKit secret、文件或环境变量传入 Dockerfile。
 - 不执行上游仓库中的脚本或 GitHub Actions；唯一允许的执行入口是 Docker/BuildKit 对 Dockerfile 的构建。
 - 不从上游仓库读取工作流配置来改变发布目标或 job 权限。
 - 每个构建使用 GitHub 托管的一次性 runner，镜像之间不共享工作目录。
@@ -215,6 +229,7 @@ Buildx 使用 GitHub Actions cache，并以镜像名作为 cache scope，避免�
 ## GHCR 行为
 
 - 新镜像发布到 `ghcr.io/yewfence/<name>:latest`。
+- 私有源只影响源码 checkout；构建结果仍发布到公开的 GHCR，公开构建记录和 digest 属于预期行为。
 - 新 package 首次发布后，由维护者在 GHCR 设置中将其切换为 public。
 - 如果同名 package 已存在，需要确保当前仓库拥有该 package 的 Actions 写权限。
 - 镜像页面应明确说明它是自动构建的非官方镜像，并链接上游仓库和许可证。
@@ -239,6 +254,7 @@ Buildx 使用 GitHub Actions cache，并以镜像名作为 cache scope，避免�
 - 按 `name` 筛选单个镜像。
 - 重复名称、未知字段和空列表。
 - 非法仓库格式、路径穿越、非法平台和不存在的手动选择。
+- `IMAGES_TOML` 的同名覆盖、新增镜像、凭据成对校验，以及凭据不出现在 matrix JSON。
 
 配置测试检查渲染器的公开接口：输入 TOML 与可选镜像名，输出 matrix JSON 或明确错误。不为 TOML 解析和 JSON 序列化建立额外 adapter。summary 测试使用代表性 matrix JSON 检查稳定的 Markdown 输出。
 

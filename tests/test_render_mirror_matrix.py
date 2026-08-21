@@ -5,7 +5,6 @@ import textwrap
 import unittest
 from pathlib import Path
 
-
 SCRIPT_PATH = Path(__file__).resolve().parents[1] / "scripts/render-mirror-matrix.py"
 SPEC = importlib.util.spec_from_file_location("render_mirror_matrix", SCRIPT_PATH)
 assert SPEC is not None and SPEC.loader is not None

@@ -6,7 +6,6 @@ from datetime import UTC, datetime
 from pathlib import Path
 from unittest.mock import call, patch
 
-
 SCRIPT_PATH = Path(__file__).resolve().parents[1] / "scripts/mirror-default-branch.py"
 SPEC = importlib.util.spec_from_file_location("mirror_default_branch", SCRIPT_PATH)
 assert SPEC is not None and SPEC.loader is not None

@@ -2,6 +2,7 @@
 "github:YewFence/forgejo-cli" = "latest"
 pinact = "latest"
 python = "latest"
+ruff = "latest"
 uv = "latest"
 
 [tasks.test]

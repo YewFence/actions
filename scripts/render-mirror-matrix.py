@@ -4,11 +4,11 @@ import argparse
 import json
 import re
 import sys
-import tomllib
 from pathlib import Path
 from typing import Any
 from urllib.parse import urlsplit
 
+import tomllib
 
 MIRROR_FIELDS = frozenset({"repository", "name", "private"})
 NAME_PATTERN = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]*$")
@@ -49,8 +49,7 @@ def _normalize_mirror(raw_mirror: Any, index: int) -> dict[str, str | bool]:
     if not path_parts:
         raise ConfigError(f"mirrors[{index}]: repository must include a repository path")
     derived_name = path_parts[-1]
-    if derived_name.endswith(".git"):
-        derived_name = derived_name[:-4]
+    derived_name = derived_name.removesuffix(".git")
 
     name = _require_string("name", raw_mirror.get("name", derived_name), index)
     if not NAME_PATTERN.fullmatch(name):
