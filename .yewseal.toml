@@ -1,0 +1,14 @@
+# YewSeal 配置
+
+[encryption]
+
+[[encryption.files]]
+plaintext = "private-repo-bake.hcl"
+encrypted = "private-repo-bake.hcl.bin"
+format = "bin"
+
+[key]
+file_path = ".age/key.txt"
+# Age 公钥,可以安全提交
+public_key = "age1m78uhvvgrwg63cp9dcwr64hvjmzyj8cemmr9vlsvgnj6ydnvaguq8cg7tn"
+

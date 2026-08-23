@@ -12,11 +12,19 @@ on:
       - main
     paths:
       - docker-bake.hcl
+      - private-repo-bake.hcl.bin
+      - .sops.yaml
+      - .yewseal.toml
+      - mise.lock
       - mise.toml
       - .github/workflows/build-images.yml
   pull_request:
     paths:
       - docker-bake.hcl
+      - private-repo-bake.hcl.bin
+      - .sops.yaml
+      - .yewseal.toml
+      - mise.lock
       - mise.toml
       - .github/workflows/build-images.yml
 
@@ -39,7 +47,6 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
-      id-token: write
     outputs:
       matrix: ${{ steps.normalize.outputs.matrix }}
       targets: ${{ steps.normalize.outputs.targets }}
@@ -54,26 +61,21 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@37fe631027851001ddb9b187196cc803df7f5f0e # v4.3.0
 
-      - name: Set up Infisical secrets
+      - name: Decrypt private Bake config
         if: github.event_name != 'pull_request'
-        continue-on-error: true
-        uses: Infisical/secrets-action@77ab1f4ccd183a543cb5b42435fbd181189f4995 # v1.0.16
-        with:
-          method: "oidc"
-          env-slug: "prod"
-          project-slug: "yew-fence-actions"
-          identity-id: "3fc82245-d8ef-4c4a-bb18-15db31b794dc"
+        env:
+          SOPS_AGE_KEY: ${{ secrets.SOPS_AGE_KEY }}
+        run: yews decrypt
 
       - name: Materialize Bake overrides
         id: bake-files
         env:
           SELECTED_NAME: ${{ github.event.inputs.name || '' }}
-          BAKE_OVERRIDE: ${{ env.DOCKER_BAKE_HCL || '' }}
         run: |
           set -euo pipefail
-          override="$RUNNER_TEMP/infisical-bake.hcl"
-          if [[ -n "$BAKE_OVERRIDE" ]]; then
-            printf '%s' "$BAKE_OVERRIDE" > "$override"
+          override="$RUNNER_TEMP/private-repo-bake.hcl"
+          if [[ -f private-repo-bake.hcl ]]; then
+            cp private-repo-bake.hcl "$override"
           else
             : > "$override"
           fi
@@ -106,7 +108,6 @@ jobs:
             printf 'group=%s\n' "$group"
             printf 'target=%s\n' "$target"
           } >> "$GITHUB_OUTPUT"
-          printf 'DOCKER_BAKE_HCL=\n' >> "$GITHUB_ENV"
 
       - name: Test repository code
         run: mise run test
@@ -173,7 +174,6 @@ jobs:
     permissions:
       contents: read
       packages: write
-      id-token: write
     runs-on: ${{ startsWith(matrix.platforms, 'linux/arm') && 'ubuntu-24.04-arm' || 'ubuntu-24.04' }}
     timeout-minutes: 120
     strategy:
@@ -189,31 +189,28 @@ jobs:
         with:
           persist-credentials: false
 
-      - name: Set up Infisical secrets
-        continue-on-error: true
-        uses: Infisical/secrets-action@77ab1f4ccd183a543cb5b42435fbd181189f4995 # v1.0.16
-        with:
-          method: "oidc"
-          env-slug: "prod"
-          project-slug: "yew-fence-actions"
-          identity-id: "3fc82245-d8ef-4c4a-bb18-15db31b794dc"
+      - name: Set up mise
+        uses: jdx/mise-action@3c2e0cf82a5b2e5249f0d3635a4d83d0ae861518 # v4.2.5
+
+      - name: Decrypt private Bake config
+        env:
+          SOPS_AGE_KEY: ${{ secrets.SOPS_AGE_KEY }}
+        run: yews decrypt
 
       - name: Materialize Bake overrides
         id: bake-files
         env:
           TARGET: ${{ matrix.target }}
-          BAKE_OVERRIDE: ${{ env.DOCKER_BAKE_HCL || '' }}
         run: |
           set -euo pipefail
-          override="$RUNNER_TEMP/infisical-bake.hcl"
-          if [[ -n "$BAKE_OVERRIDE" ]]; then
-            printf '%s' "$BAKE_OVERRIDE" > "$override"
+          override="$RUNNER_TEMP/private-repo-bake.hcl"
+          if [[ -f private-repo-bake.hcl ]]; then
+            cp private-repo-bake.hcl "$override"
           else
             : > "$override"
           fi
           printf 'target "%s" {\n  secret = ["id=GIT_AUTH_TOKEN,env=GIT_AUTH_TOKEN"]\n}\n' "$TARGET" >> "$override"
           printf 'override=%s\n' "$override" >> "$GITHUB_OUTPUT"
-          printf 'DOCKER_BAKE_HCL=\n' >> "$GITHUB_ENV"
 
       - name: Create GitHub App token
         id: app-token

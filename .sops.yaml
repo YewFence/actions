@@ -1,0 +1,3 @@
+creation_rules:
+    - path_regex: ^private-repo-bake\.hcl\.bin$
+      age: age1m78uhvvgrwg63cp9dcwr64hvjmzyj8cemmr9vlsvgnj6ydnvaguq8cg7tn

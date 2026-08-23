@@ -9,7 +9,7 @@
 
 ## 背景
 
-本仓库使用 Docker Buildx Bake 作为镜像声明和构建入口。仓库内的 `docker-bake.hcl` 声明公开构建目标；Infisical OIDC action 可以在受信任的发布事件中注入额外的 Bake HCL，用于覆盖现有 target 或增加私有 target。Docker Bake 直接使用上游 Git 仓库作为构建 context，不再由 Actions checkout 上游源码。
+本仓库使用 Docker Buildx Bake 作为镜像声明和构建入口。仓库内的 `docker-bake.hcl` 声明公开构建目标；加密的 `private-repo-bake.hcl.bin` 在受信任的发布 job 中解密为临时的 Bake HCL，用于增加私有 target。Docker Bake 直接使用上游 Git 仓库作为构建 context，不再由 Actions checkout 上游源码。
 
 ## 目标
 
@@ -17,7 +17,7 @@
 - 从公开或私有的 GitHub 仓库构建镜像，并发布为 `ghcr.io/yewfence/<target>:latest`。
 - 支持手动构建、默认分支构建和 pull request smoke build。
 - 在 `ubuntu-24.04` 与 `ubuntu-24.04-arm` 上分别原生构建 amd64 和 arm64。
-- 让 Docker Bake matrix action 解析 target 和平台，不再维护镜像矩阵转换器。
+- 让 Docker Bake 解析 target 和平台，不再维护镜像矩阵转换器。
 - 使用 GitHub App installation token 访问需要权限的上游 Git context。
 - 保留发布 digest，并让最终的 `latest` 始终是多平台 manifest。
 
@@ -35,7 +35,7 @@
 
 `docker-bake.hcl` 是公开构建配置的唯一事实来源。每个 target 的名称同时是 GHCR package 名和 workflow_dispatch 的选择值；target 内声明 Git context、Dockerfile、目标平台、标签和 OCI labels。
 
-Bake 的多文件覆盖规则负责合并仓库配置和 Infisical 配置。后加载文件中的同名 target 可以覆盖或补充前一个文件中的属性；因此受保护的 Infisical HCL 可以增加私有镜像，也可以调整公开镜像的 source ref。
+Bake 的多文件规则负责合并仓库配置和私有配置；私有 HCL 只声明新增 target，不重复公开 target。
 
 ### 远程 Git context
 
@@ -60,7 +60,7 @@ context = "https://github.com/YewFence/example.git?branch=main&subdir=container"
 
 ### 原生多平台构建
 
-`docker/bake-action/subaction/matrix` 从 Bake target 的 `platforms` 属性生成矩阵。每个平台 job 使用固定 runner 映射：
+`docker/bake-action/subaction/matrix` 从 Bake target 的 `platforms` 属性生成矩阵。它会在 job 日志中输出完整的 Bake definition；当前私有配置只包含需要保护的上游仓库地址，后续再增加日志清理 action。每个平台 job 使用固定 runner 映射：
 
 ```text
 linux/amd64 -> ubuntu-24.04
@@ -83,6 +83,9 @@ GitHub App 必须对所有需要构建的上游仓库具有 `Contents: read` 权
 ```text
 .
 ├── docker-bake.hcl
+├── private-repo-bake.hcl.bin
+├── .sops.yaml
+├── .yewseal.toml
 ├── mise.toml
 └── .github/
     └── workflows/
@@ -91,9 +94,19 @@ GitHub App 必须对所有需要构建的上游仓库具有 `Contents: read` 权
 
 target 解析、平台展开和配置合并由 Docker Buildx Bake 负责；workflow 只把矩阵和 digest 作为后续 job 的机器可读输出。
 
-## Infisical 覆盖配置
+## 私有 Bake 配置
 
-Infisical 项目 `yew-fence-actions` 可以提供名为 `DOCKER_BAKE_HCL` 的多行 secret。该 secret 必须是合法的 Bake HCL，可以包含一个或多个 target，例如：
+私有 target 保存在加密文件 `private-repo-bake.hcl.bin` 中。`.yewseal.toml` 定义明文和密文文件的对应关系，`.sops.yaml` 定义 Age recipient。明文文件 `private-repo-bake.hcl` 被 `.gitignore` 忽略，不会提交到仓库。
+
+GitHub Actions repository secret 只需要提供：
+
+```text
+SOPS_AGE_KEY=<对应 Age recipient 的私钥>
+```
+
+默认分支的 `check` 和每个平台的 `publish` job 会把它设置为同名环境变量，然后直接运行 `yews decrypt`。PR 不读取该 secret，也不会解密私有配置。
+
+解密后的 HCL 只需要包含新增的 target，例如：
 
 ```hcl
 target "private-image" {
@@ -102,15 +115,9 @@ target "private-image" {
   platforms  = ["linux/amd64", "linux/arm64"]
   tags       = ["ghcr.io/yewfence/private-image:latest"]
 }
-
-target "agent-vault" {
-  context = "https://github.com/YewFence/agent-vault.git?branch=release"
-}
 ```
 
-`check` job 和每个发布平台 job 都独立运行 Infisical action，并在各自的 runner 临时目录写入 HCL 文件。check job 用合并后的 Bake 文件生成 target/platform matrix；发布 job 用同一份合并配置执行实际构建。runner job 结束后临时文件随一次性 runner 销毁。
-
-Infisical action 使用 `continue-on-error: true`。Infisical 不可用时，工作流回退到仓库内的 `docker-bake.hcl`；这允许公开 target 继续构建，但本次不会发现或构建仅存在于 Infisical 中的私有 target。
+workflow 会将解密文件与仓库内的 `docker-bake.hcl` 一起加载。没有手动指定 target 时，会根据两份配置合并后的 target 列表生成临时默认 group，因此新增的私有 target 会自动参与默认构建。
 
 ## 工作流设计
 
@@ -119,10 +126,10 @@ Infisical action 使用 `continue-on-error: true`。Infisical 不可用时，工
 `check` job 在 pull request 或默认分支构建中运行，负责：
 
 1. checkout 当前编排仓库。
-2. 在非 pull request 事件中通过 OIDC 读取 `DOCKER_BAKE_HCL`。
-3. 将仓库 HCL 与 Infisical HCL 作为两个 Bake 文件加载。
+2. 在非 pull request 事件中通过 `SOPS_AGE_KEY` 和 `yews decrypt` 解密私有 Bake 配置。
+3. 将仓库 HCL 与解密后的私有 HCL 作为两个 Bake 文件加载。
 4. 运行 `mise run test`。
-5. 使用 Docker 官方 Bake matrix action 按 target 的 platforms 展开矩阵。没有手动选择 target 时，workflow 会根据 Bake 的 target 列表生成临时 `generated-default` group，因此 Infisical 新增的 target 不需要修改仓库内的 group。
+5. 使用 Docker 官方 Bake matrix action 按 target 的 platforms 展开矩阵。没有手动选择 target 时，workflow 会根据两份 Bake 配置合并后的 target 列表生成临时 `generated-default` group。
 6. 将完整平台矩阵和去重后的 target 矩阵写入 job output。
 
 workflow_dispatch 的 `name` 输入直接作为 Bake target 名；空输入使用 `default` group。
@@ -136,14 +143,14 @@ workflow_dispatch 的 `name` 输入直接作为 Bake target 名；空输入使�
 3. 使用 Bake 读取 target 的远程 Git context。
 4. 将输出覆盖为 `type=cacheonly`，不登录 GHCR、不推送镜像、不写发布 cache。
 
-pull request 不读取 Infisical，不创建 GitHub App token。来自 fork 的 pull request 因此不会接触发布凭据。
+pull request 不读取 `SOPS_AGE_KEY`，不解密私有配置，也不创建 GitHub App token。来自 fork 的 pull request 因此不会接触发布凭据。
 
 ### `publish` job
 
 `publish` 不在 pull request 中运行。每个平台 matrix 项：
 
 1. checkout 当前编排仓库。
-2. 通过 Infisical 读取并物化合并 HCL。
+2. 通过 `SOPS_AGE_KEY` 运行 `yews decrypt`，读取并物化私有 HCL。
 3. 创建 GitHub App installation token。
 4. 将 `GIT_AUTH_TOKEN` 绑定到 Bake target 的 BuildKit secret。
 5. 使用原生 runner 构建单个平台。
@@ -156,10 +163,9 @@ pull request 不读取 Infisical，不创建 GitHub App token。来自 fork 的 
 permissions:
   contents: read
   packages: write
-  id-token: write
 ```
 
-`id-token: write` 用于 Infisical OIDC；GHCR 登录使用当前 workflow 的 `GITHUB_TOKEN`。
+GHCR 登录使用当前 workflow 的 `GITHUB_TOKEN`。
 
 ### `publish-manifest` job
 
@@ -183,21 +189,21 @@ cleanup 使用去重后的 target 矩阵，仅在最终 manifest 发布成功后
 ### 信任内容
 
 - 默认分支中的 `docker-bake.hcl` 和 workflow 是受信任的发布配置。
-- Infisical 中的 `DOCKER_BAKE_HCL` 是受保护的发布输入。
+- 加密的 `private-repo-bake.hcl.bin` 和 `SOPS_AGE_KEY` 是受保护的发布输入。
 - GitHub App private key 只用于生成短期 installation token。
 - App 安装明确列出的上游仓库是允许的 Docker 构建输入。
 
 ### 强制约束
 
-- pull request 事件绝不进入拥有 `packages: write` 的 job，也不执行 Infisical 或 App token action。
+- pull request 事件绝不进入拥有 `packages: write` 的 job，也不读取 `SOPS_AGE_KEY` 或创建 GitHub App token。
 - 上游 Git token 不写入 Bake HCL、matrix output、artifact 或 Dockerfile build arg。
 - BuildKit 只通过预定义的 `GIT_AUTH_TOKEN` secret 获取远程 Git 认证。
 - 不执行上游仓库中的 GitHub Actions；唯一允许的上游执行入口是 Dockerfile 构建。
-- target、context、Dockerfile、tags 和 platforms 来自受信任的仓库 HCL 或 Infisical 覆盖，不接受普通 workflow_dispatch 输入覆盖。
+- target、context、Dockerfile、tags 和 platforms 来自受信任的仓库 HCL 或加密私有 HCL，不接受普通 workflow_dispatch 输入覆盖。
 - 每个平台使用 GitHub 托管的一次性 runner，构建 job 之间不共享工作目录。
 - 每个构建设置超时，避免异常构建长期占用 runner。
 
-Bake HCL 是受信任配置，因此可以指定任意 BuildKit target、远程 context 和 output。Infisical 项目权限必须限制在发布维护者范围内。
+Bake HCL 是受信任配置，因此可以指定任意 BuildKit target、远程 context 和 output。Age 私钥只应配置为 GitHub Actions repository secret，并限制能够修改默认分支 workflow 的人员范围。
 
 ## 测试与验证
 

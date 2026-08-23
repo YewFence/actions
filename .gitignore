@@ -1,1 +1,8 @@
 __pycache__/
+.age/
+
+# YewSeal - Decrypted configuration files
+private-repo-bake.hcl
+
+# YewSeal - Age private keys
+.age/keys.txt

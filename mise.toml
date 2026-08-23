@@ -1,4 +1,5 @@
 [tools]
+"github:YewFence/YewSeal" = "latest"
 "github:YewFence/forgejo-cli" = "latest"
 pinact = "latest"
 python = "latest"
