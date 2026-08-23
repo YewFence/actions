@@ -192,6 +192,9 @@ jobs:
       - name: Set up mise
         uses: jdx/mise-action@3c2e0cf82a5b2e5249f0d3635a4d83d0ae861518 # v4.2.5
 
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@37fe631027851001ddb9b187196cc803df7f5f0e # v4.3.0
+
       - name: Decrypt private Bake config
         env:
           SOPS_AGE_KEY: ${{ secrets.SOPS_AGE_KEY }}
@@ -210,7 +213,19 @@ jobs:
             : > "$override"
           fi
           printf 'target "%s" {\n  secret = ["id=GIT_AUTH_TOKEN,env=GIT_AUTH_TOKEN"]\n}\n' "$TARGET" >> "$override"
-          printf 'override=%s\n' "$override" >> "$GITHUB_OUTPUT"
+          context="$(docker buildx bake \
+            --file docker-bake.hcl \
+            --file "$override" \
+            --print "$TARGET" |
+            jq -er --arg target "$TARGET" '.target[$target].context')"
+          owner="$GITHUB_REPOSITORY_OWNER"
+          if [[ "$context" =~ ^https://github\.com/([^/]+)/ ]]; then
+            owner="${BASH_REMATCH[1]}"
+          fi
+          {
+            printf 'override=%s\n' "$override"
+            printf 'owner=%s\n' "$owner"
+          } >> "$GITHUB_OUTPUT"
 
       - name: Create GitHub App token
         id: app-token
@@ -218,10 +233,7 @@ jobs:
         with:
           client-id: ${{ vars.SOURCE_APP_CLIENT_ID }}
           private-key: ${{ secrets.SOURCE_APP_PRIVATE_KEY }}
-          owner: ${{ github.repository_owner }}
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@37fe631027851001ddb9b187196cc803df7f5f0e # v4.3.0
+          owner: ${{ steps.bake-files.outputs.owner }}
 
       - name: Log in to GHCR
         uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
@@ -235,7 +247,6 @@ jobs:
         uses: docker/bake-action@d3418bd7d0e9324001bca92fa8ba175ea7e6dc9b # v7.3.0
         env:
           BUILDX_BAKE_GIT_AUTH_TOKEN: ${{ steps.app-token.outputs.token }}
-          GIT_AUTH_HEADER: bearer
           GIT_AUTH_TOKEN: ${{ steps.app-token.outputs.token }}
           DOCKER_BUILD_RECORD_UPLOAD: "false"
         with:

@@ -7,10 +7,6 @@ target "agent-vault" {
   dockerfile = "Dockerfile"
   platforms  = ["linux/amd64", "linux/arm64"]
 
-  tags = [
-    "ghcr.io/yewfence/agent-vault:latest",
-  ]
-
   labels = {
     "org.opencontainers.image.source" = "https://github.com/YewFence/agent-vault"
   }

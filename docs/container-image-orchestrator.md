@@ -33,7 +33,7 @@
 
 ### Docker Bake 是唯一构建配置
 
-`docker-bake.hcl` 是公开构建配置的唯一事实来源。每个 target 的名称同时是 GHCR package 名和 workflow_dispatch 的选择值；target 内声明 Git context、Dockerfile、目标平台、标签和 OCI labels。
+`docker-bake.hcl` 是公开构建配置的唯一事实来源。每个 target 的名称同时是 GHCR package 名和 workflow_dispatch 的选择值；target 内声明 Git context、Dockerfile、目标平台和 OCI labels。target 不声明标签；唯一的 `latest` 标签由 `publish-manifest` job 通过 `imagetools create` 统一管理，按 digest 推送的单平台构建不与标签耦合。
 
 Bake 的多文件规则负责合并仓库配置和私有配置；私有 HCL 只声明新增 target，不重复公开 target。
 
@@ -46,7 +46,6 @@ target "agent-vault" {
   context    = "https://github.com/YewFence/agent-vault.git?branch=main"
   dockerfile = "Dockerfile"
   platforms  = ["linux/amd64", "linux/arm64"]
-  tags       = ["ghcr.io/yewfence/agent-vault:latest"]
 }
 ```
 
@@ -113,7 +112,6 @@ target "private-image" {
   context    = "https://github.com/YewFence/private-image.git?branch=main"
   dockerfile = "containers/Dockerfile"
   platforms  = ["linux/amd64", "linux/arm64"]
-  tags       = ["ghcr.io/yewfence/private-image:latest"]
 }
 ```
 
@@ -199,7 +197,7 @@ cleanup 使用去重后的 target 矩阵，仅在最终 manifest 发布成功后
 - 上游 Git token 不写入 Bake HCL、matrix output、artifact 或 Dockerfile build arg。
 - BuildKit 只通过预定义的 `GIT_AUTH_TOKEN` secret 获取远程 Git 认证。
 - 不执行上游仓库中的 GitHub Actions；唯一允许的上游执行入口是 Dockerfile 构建。
-- target、context、Dockerfile、tags 和 platforms 来自受信任的仓库 HCL 或加密私有 HCL，不接受普通 workflow_dispatch 输入覆盖。
+- target、context、Dockerfile 和 platforms 来自受信任的仓库 HCL 或加密私有 HCL，不接受普通 workflow_dispatch 输入覆盖。
 - 每个平台使用 GitHub 托管的一次性 runner，构建 job 之间不共享工作目录。
 - 每个构建设置超时，避免异常构建长期占用 runner。
 
