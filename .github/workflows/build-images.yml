@@ -165,7 +165,7 @@ jobs:
           targets: ${{ matrix.target }}
           provenance: false
           set: |
-            ${{ matrix.target }}.platforms=${{ matrix.platforms }}
+            ${{ matrix.target }}.platform=${{ matrix.platforms }}
             ${{ matrix.target }}.output=type=cacheonly
 
   publish:
@@ -245,7 +245,7 @@ jobs:
           targets: ${{ matrix.target }}
           provenance: false
           set: |
-            ${{ matrix.target }}.platforms=${{ matrix.platforms }}
+            ${{ matrix.target }}.platform=${{ matrix.platforms }}
             ${{ matrix.target }}.output=type=registry,name=ghcr.io/yewfence/${{ matrix.target }},push-by-digest=true,name-canonical=true,push=true
             ${{ matrix.target }}.cache-from=type=gha,scope=${{ matrix.target }}-${{ matrix.platforms }}
             ${{ matrix.target }}.cache-to=type=gha,mode=max,scope=${{ matrix.target }}-${{ matrix.platforms }}
