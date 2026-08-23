@@ -241,7 +241,7 @@ jobs:
         with:
           files: |
             docker-bake.hcl
-            ${{ steps.bake-files.outputs.override }}
+            cwd://${{ steps.bake-files.outputs.override }}
           targets: ${{ matrix.target }}
           provenance: false
           set: |
