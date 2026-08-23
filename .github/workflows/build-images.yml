@@ -265,10 +265,13 @@ jobs:
         id: digest
         env:
           TARGET: ${{ matrix.target }}
-          METADATA: ${{ steps.build.outputs.metadata }}
         run: |
           set -euo pipefail
-          digest="$(jq -er --arg target "$TARGET" '.[$target]["containerimage.digest"]' <<< "$METADATA")"
+          metadata="$RUNNER_TEMP/bake-metadata.json"
+          cat <<'METADATA_EOF' > "$metadata"
+          ${{ steps.build.outputs.metadata }}
+          METADATA_EOF
+          digest="$(jq -er --arg target "$TARGET" '.[$target]["containerimage.digest"]' "$metadata")"
           mkdir -p "$RUNNER_TEMP/digests"
           : > "$RUNNER_TEMP/digests/${digest#sha256:}"
           printf 'digest=%s\n' "$digest" >> "$GITHUB_OUTPUT"
