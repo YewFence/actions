@@ -42,3 +42,7 @@ uv run python scripts/render-workflow-summary.py mirror-result \
 [tasks.mirror-sync]
 description = "Mirror and archive one repository's default branch"
 run = "uv run python scripts/mirror-default-branch.py"
+
+[tasks.forks-check]
+description = "Check which forks are behind upstream and notify via Telegram"
+run = "uv run python scripts/check-fork-outdated.py"

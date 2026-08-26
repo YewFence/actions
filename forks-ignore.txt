@@ -1,0 +1,6 @@
+# 忽略列表：以下 fork 不参与 outdated 检查
+# 每行一个仓库；支持 "owner/repo"（推荐，全局唯一）或裸仓库名（跨 owner 匹配，少用）
+# 行内注释用 # 分隔
+# 示例：
+# YewFence/JASM
+# some-repo

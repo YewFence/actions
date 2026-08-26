@@ -8,6 +8,7 @@
 
 - [声明式容器镜像编排器](docs/container-image-orchestrator.md)
 - [Forgejo 默认分支镜像与历史归档](docs/mirror-design.md)
+- [Fork Outdated Notifier](docs/fork-outdated-notifier.md)
 
 ## Rewrite Infisical History
 
@@ -40,3 +41,23 @@
 tags 只会推送当前浅克隆历史里能关联到 `HEAD` 祖先提交，并且名称符合 `vX.Y.Z` 格式的正式版本 tags，所以 nightly 之类的 tags 不会被推送，并且这些正式版本 tags 也会使用强制推送。
 
 如果目标远端里有重要内容，先确认目标分支和 tags 可以被覆盖。
+
+## Fork Outdated Notifier
+
+工作流文件在 `.github/workflows/fork-outdated-notifier.yml`。
+
+它每天自动运行一次，也可以在 GitHub Actions 页面手动触发。运行时会列出当前用户名下所有公开 fork，用 GitHub compare API 比较 fork 默认分支与上游默认分支，把落后于上游的 fork（领先的不会列出）汇总为一条 Telegram 消息发送，并在 Job Summary 中输出完整表格。上游已被删除或不可访问的 fork 不会被误判为 outdated，只会在 Summary 中单独列出。
+
+### 需要配置的 secrets
+
+`TELEGRAM_BOT_TOKEN` 是 Telegram Bot 的 token（向 @BotFather 申请）。
+
+`TELEGRAM_CHAT_ID` 是接收消息的聊天 ID。
+
+两个 Telegram secrets 都是可选的；不配置时只输出 Job Summary，不发送消息。
+
+`FORKS_GH_TOKEN` 是用于调用 GitHub API 的 token（可选）。不配置时使用工作流自动注入的 `GITHUB_TOKEN`；如果 fork 数量较多或希望速率限制更宽松，可以配置一个只需公开仓库只读权限的 PAT。
+
+### 忽略列表
+
+仓库根目录的 `forks-ignore.txt` 每行列出一个不参与检查的仓库，支持 `owner/repo`（推荐）或裸仓库名，`#` 后内容为注释。
