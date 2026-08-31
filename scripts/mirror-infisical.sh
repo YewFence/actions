@@ -37,6 +37,9 @@ CUSTOM_BRANCH="${CUSTOM_BRANCH:-custom}"
 GIT_USER_NAME="${GIT_USER_NAME:-github-actions[bot]}"
 GIT_USER_EMAIL="${GIT_USER_EMAIL:-41898282+github-actions[bot]@users.noreply.github.com}"
 
+
+
+
 if [[ "$INFISICAL_MIRROR_URL" == http://* || "$INFISICAL_MIRROR_URL" == https://* ]]; then
   : "${INFISICAL_MIRROR_USERNAME:?missing INFISICAL_MIRROR_USERNAME}"
   : "${INFISICAL_MIRROR_TOKEN:?missing INFISICAL_MIRROR_TOKEN}"

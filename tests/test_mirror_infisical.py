@@ -1,4 +1,3 @@
-import os
 import subprocess
 import tempfile
 import unittest
@@ -11,6 +10,8 @@ class MirrorInfisicalTests(unittest.TestCase):
     def setUp(self) -> None:
         self.temporary_directory = tempfile.TemporaryDirectory()
         root = Path(self.temporary_directory.name)
+        self.home = root / "home"
+        self.home.mkdir()
         self.source = root / "source"
         self.target = root / "target.git"
         self.git("init", "-b", "main", str(self.source))
@@ -59,7 +60,7 @@ class MirrorInfisicalTests(unittest.TestCase):
             "CUSTOM_BRANCH": "custom",
             "GIT_USER_NAME": "Mirror Bot",
             "GIT_USER_EMAIL": "mirror-bot@example.invalid",
-            "HOME": os.environ.get("HOME", "/tmp"),
+            "HOME": str(self.home),
         }
         env.update(overrides)
         return subprocess.run(
@@ -97,6 +98,7 @@ class MirrorInfisicalTests(unittest.TestCase):
             self.target_ref_sha("refs/tags/v1.0.0"), self.upstream_tag_sha("v1.0.0")
         )
         self.assertIn("does not exist yet", result.stdout)
+
 
     def test_incremental_fast_forwards_main_and_new_tag(self) -> None:
         self.commit("initial", content="one\n")
