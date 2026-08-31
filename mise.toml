@@ -47,6 +47,9 @@ run = "uv run python scripts/mirror-default-branch.py"
 [tasks.infisical-mirror]
 description = "Mirror infisical main and tags to the private target and rebase the custom branch"
 run = "fnox exec -- bash scripts/mirror-infisical.sh"
+[tasks.infisical-mirror.env]
+SOURCE_REPO = "https://github.com/infisical/infisical.git"
+SOURCE_BRANCH = "main"
 
 [tasks.forks-check]
 description = "Check which forks are behind upstream and notify via Telegram"
