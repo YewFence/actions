@@ -6,3 +6,6 @@ private-repo-bake.hcl
 
 # YewSeal - Age private keys
 .age/keys.txt
+
+# fnox - Local overrides (may contain plaintext)
+fnox.local.toml

@@ -10,37 +10,58 @@
 - [Forgejo 默认分支镜像与历史归档](docs/mirror-design.md)
 - [Fork Outdated Notifier](docs/fork-outdated-notifier.md)
 
-## Rewrite Infisical History
+## Mirror Infisical
 
-工作流文件在 `.github/workflows/rewrite-infisical-history.yml`。
+工作流文件在 `.github/workflows/mirror-infisical.yml`。
 
-它每天自动运行一次，也可以在 GitHub Actions 页面手动触发。运行时会克隆 `github.com/infisical/infisical` 的 `main` 分支最近 100 个提交和对应 tags，安装 Rust 与 `filter-repo-rs`，从历史记录里移除整个 `docs` 和 `.github` 目录，然后把重写后的分支和相关 tags 强制推送到你指定的目标远端。
+它每天自动运行一次，也可以在 GitHub Actions 页面手动触发。运行时把 `github.com/infisical/infisical` 的 `main` 分支和全部 tags 原样（SHA 保真）同步到目标私有仓库：目标分支缺失时用全量克隆做一次性 seed，之后每轮用 blobless 克隆目标仓库作为对象缓存，只从上游拉取增量并快进推送。`main` 使用绑定旧 SHA 的 `--force-with-lease` 更新，tags 跟随上游强制更新。上游重写历史时镜像会跟随，不归档旧 tip。
 
-### 需要配置的变量
-
-`TARGET_REMOTE_URL` 可以放在 repository variables 或 repository secrets 里，值是目标仓库的 HTTPS 地址，例如 `https://github.com/example/example.git`。
-
-`TARGET_REMOTE_BRANCH` 可以放在 repository variables 或 repository secrets 里，值是要推送到的目标分支名，例如 `main`。
-
-`GIT_USER_NAME` 可以放在 repository variables 或 repository secrets 里，值是 Git 提交身份里的用户名，不配置时会使用 `github-actions[bot]`。
-
-`GIT_USER_EMAIL` 可以放在 repository variables 或 repository secrets 里，值是 Git 提交身份里的邮箱，不配置时会使用 `41898282+github-actions[bot]@users.noreply.github.com`。
+目标仓库上可以维护一个 `custom` 分支存放自己的提交。每次镜像完成后，工作流会把它 rebase 到新的 `main` 顶端并推送；已经位于顶端的 custom 分支会被跳过，不会反复重写。rebase 冲突或上游历史重写导致无法自动 rebase 时，`main` 和 tags 照常镜像，custom 保持原样，job 以失败结束并给出提示，等人工处理。
 
 ### 需要配置的 secrets
 
-`TARGET_REMOTE_USERNAME` 是目标远端的 HTTPS 用户名。
+`FNOX_AGE_KEY` 是解密 `fnox.toml` 的 age 私钥（`AGE-SECRET-KEY-...` 字符串）。
 
-`TARGET_REMOTE_PASSWORD` 是目标远端的 HTTPS 密码或 token。
+目标仓库的凭据不放在 GitHub secrets 里，而是加密提交在仓库根目录的 `fnox.toml` 中，由 `fnox exec` 在运行任务时解密并注入环境变量：
 
-这个工作流不会使用 SSH，所以目标远端认证必须能通过 HTTPS 用户名和密码或 token 完成。
+```bash
+fnox set INFISICAL_MIRROR_URL https://github.com/example/infisical.git
+fnox set INFISICAL_MIRROR_USERNAME example
+fnox set INFISICAL_MIRROR_TOKEN ghp_xxx
+```
+
+`INFISICAL_MIRROR_URL` 是目标私有仓库的 HTTPS 地址；`INFISICAL_MIRROR_USERNAME` 是目标远端的 HTTPS 用户名；`INFISICAL_MIRROR_TOKEN` 是目标远端的 HTTPS token（GitHub PAT）。
+
+### 需要配置的变量
+
+`INFISICAL_MIRROR_BRANCH` 可以放在 repository variables 里，值是要推送到的目标分支名，不配置时使用 `main`。
+
+`CUSTOM_BRANCH` 可以放在 repository variables 里，值是要 rebase 到 main 顶端的自定义分支名，不配置时使用 `custom`。目标仓库上没有这个分支时本轮跳过，不影响镜像。
+
+`GIT_USER_NAME` 可以放在 repository variables 里，值是 Git 提交身份里的用户名，不配置时使用 `github-actions[bot]`。
+
+`GIT_USER_EMAIL` 可以放在 repository variables 里，值是 Git 提交身份里的邮箱，不配置时使用 `41898282+github-actions[bot]@users.noreply.github.com`。
 
 ### 推送行为
 
-目标分支会被 `git push --force` 覆盖。
+目标分支只在首次 seed 或上游非 fast-forward 更新时使用受 lease 保护的强制推送，正常同步都是快进。上游移动的 tag 会跟随；上游删除的 tag 不会从目标删除。
 
-tags 只会推送当前浅克隆历史里能关联到 `HEAD` 祖先提交，并且名称符合 `vX.Y.Z` 格式的正式版本 tags，所以 nightly 之类的 tags 不会被推送，并且这些正式版本 tags 也会使用强制推送。
+custom 分支由工作流独占维护：只在需要 rebase 时用绑定旧 SHA 的 lease 强制推送，其余情况不触碰。上游重写历史导致 custom 与 main 不再共享历史时，工作流失败告警并保留 custom，等待人工处理。
 
-如果目标远端里有重要内容，先确认目标分支和 tags 可以被覆盖。
+### 本地开发
+
+自己的提交不需要在本地维护完整仓库。维护 custom 分支时，本地可以用 blobless + sparse 的最小克隆：
+
+```bash
+git clone --filter=blob:none --sparse --single-branch --branch custom https://github.com/<you>/<target>.git
+git sparse-checkout set <你要改动的目录>
+```
+
+工作流在服务端完成 rebase 后，本地 `git pull --rebase` 即可（本地没有未推送提交时也可以 `git fetch && git reset --hard origin/custom`）。
+
+### 备份
+
+目标私有仓库可以用 Forgejo 的 pull mirror 指向它做整体备份；pull mirror 会把 main、tags 和 custom 一起镜像。
 
 ## Fork Outdated Notifier
 

@@ -2,6 +2,7 @@
 "github:YewFence/YewSeal" = "latest"
 "github:YewFence/forgejo-cli" = "latest"
 pinact = "latest"
+fnox = "latest"
 python = "latest"
 ruff = "latest"
 uv = "latest"
@@ -43,6 +44,14 @@ uv run python scripts/render-workflow-summary.py mirror-result \
 description = "Mirror and archive one repository's default branch"
 run = "uv run python scripts/mirror-default-branch.py"
 
+[tasks.infisical-mirror]
+description = "Mirror infisical main and tags to the private target and rebase the custom branch"
+run = "fnox exec -- bash scripts/mirror-infisical.sh"
+
 [tasks.forks-check]
 description = "Check which forks are behind upstream and notify via Telegram"
 run = "uv run python scripts/check-fork-outdated.py"
+
+[env]
+GIT_USER_NAME = "YewFence"
+GIT_USER_EMAIL = "hello@yewfence.dev"
