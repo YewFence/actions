@@ -5,9 +5,6 @@ repository = "https://github.com/YewFence/actions.git"
 repository = "https://github.com/MDX-Tom/gpt-5.6-instruct.git"
 
 [[mirrors]]
-repository = "https://github.com/ILoveBingLu/CipherTalk.git"
-
-[[mirrors]]
 repository = "https://github.com/jhl337/Auto_WeLearn.git"
 
 [[mirrors]]
