@@ -1,0 +1,6 @@
+interface:
+  display_name: "YewSeal Secrets"
+  short_description: "Decrypt and edit YewSeal-protected plaintext under explicit authorization"
+  default_prompt: "Use $yewseal-secrets to perform this explicitly authorized plaintext work on the YewSeal files this task involves."
+policy:
+  allow_implicit_invocation: false
