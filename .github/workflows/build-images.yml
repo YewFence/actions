@@ -12,6 +12,7 @@ on:
       - main
     paths:
       - docker-bake.hcl
+      - images/**
       - private-repo-bake.hcl.bin
       - .sops.yaml
       - .yewseal.toml
@@ -21,6 +22,7 @@ on:
   pull_request:
     paths:
       - docker-bake.hcl
+      - images/**
       - private-repo-bake.hcl.bin
       - .sops.yaml
       - .yewseal.toml

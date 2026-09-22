@@ -1,5 +1,15 @@
 group "default" {
-  targets = ["agent-vault", "komodo-core", "komodo-periphery", "komodo-cli"]
+  targets = ["agent-vault", "komodo-core", "komodo-periphery", "komodo-cli", "resticprofile-runner"]
+}
+
+target "resticprofile-runner" {
+  context    = "https://github.com/YewFence/actions.git?branch=main&subdir=images/resticprofile-runner"
+  dockerfile = "Dockerfile"
+  platforms  = ["linux/amd64", "linux/arm64"]
+
+  labels = {
+    "org.opencontainers.image.source" = "https://github.com/YewFence/actions"
+  }
 }
 
 target "agent-vault" {
