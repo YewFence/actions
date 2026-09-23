@@ -1,0 +1,9 @@
+# resticprofile-runner 镜像的构建期工具清单，由 Dockerfile 的 mise 阶段安装。
+# 版本与下载 sha256 由 mise.lock 锁定；升级时先改这里的版本号，再在本目录运行 `mise lock`。
+[tools]
+rclone = "1.75.1"
+"github:aptible/supercronic" = "0.2.49"
+
+[settings]
+# 镜像只在 Alpine(musl) 的 amd64/arm64 上构建；锁文件也只保留这两个目标。
+lockfile_platforms = ["linux-x64-musl", "linux-arm64-musl"]
