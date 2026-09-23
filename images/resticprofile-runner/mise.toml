@@ -1,7 +1,7 @@
 # resticprofile-runner 镜像的构建期工具清单，由 Dockerfile 的 mise 阶段安装。
 # 版本与下载 sha256 由 mise.lock 锁定；升级时先改这里的版本号，再在本目录运行 `mise lock`。
+# rclone 不在此管理：上游镜像自带的版本即备份链路验证版本，不再覆盖。
 [tools]
-rclone = "1.75.1"
 "github:aptible/supercronic" = "0.2.49"
 
 [settings]
