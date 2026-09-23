@@ -180,7 +180,7 @@ docker buildx imagetools create \
 
 ### `cleanup` job
 
-cleanup 使用去重后的 target 矩阵，仅在最终 manifest 发布成功后运行。它删除没有标签的旧 GHCR container versions，并保留最近两个版本。digest-only 平台 manifests 会在后续 cleanup 中被清理，不影响 `latest` manifest。
+cleanup 使用去重后的 target 矩阵，仅在最终 manifest 发布成功后运行。它删除没有标签的旧 GHCR container versions，并保留最近十个未标记版本。digest-only 平台 manifests 会在后续 cleanup 中被清理，不影响 `latest` manifest。
 
 ## 安全模型
 
