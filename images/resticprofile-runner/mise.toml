@@ -3,6 +3,7 @@
 # rclone 不在此管理：上游镜像自带的版本即备份链路验证版本，不再覆盖。
 [tools]
 "github:aptible/supercronic" = "0.2.49"
+jq = "1.8.2"
 
 [settings]
 # 镜像只在 Alpine(musl) 的 amd64/arm64 上构建；锁文件也只保留这两个目标。

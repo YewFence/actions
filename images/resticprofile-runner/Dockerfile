@@ -19,8 +19,10 @@ COPY mise.toml mise.lock ./
 RUN mise trust \
     && mise install --locked \
     && mkdir /out \
-    && cp "$(mise which supercronic)" /out/supercronic
+    && cp "$(mise which supercronic)" /out/supercronic \
+    && cp "$(mise which jq)" /out/jq
 
 FROM creativeprojects/resticprofile:0.33.1@sha256:c8afc532eb7693908ca8f0f0a791f632098268ec8ab1b4b63af1a642894a6ad7 AS final
 
 COPY --from=mise-tools /out/supercronic /usr/local/bin/supercronic
+COPY --from=mise-tools /out/jq /usr/local/bin/jq
