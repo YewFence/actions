@@ -231,6 +231,10 @@ jobs:
 
       - name: Create GitHub App token
         id: app-token
+        # The App is only installed on our own accounts and orgs; for any
+        # other context owner this probe fails and the build falls back to
+        # GITHUB_TOKEN (public repos) below.
+        continue-on-error: true
         uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
         with:
           client-id: ${{ vars.SOURCE_APP_CLIENT_ID }}
@@ -248,8 +252,11 @@ jobs:
         id: build
         uses: docker/bake-action@d3418bd7d0e9324001bca92fa8ba175ea7e6dc9b # v7.3.0
         env:
-          BUILDX_BAKE_GIT_AUTH_TOKEN: ${{ steps.app-token.outputs.token }}
-          GIT_AUTH_TOKEN: ${{ steps.app-token.outputs.token }}
+          # A failed app-token probe (context owner without our App
+          # installation) leaves the output empty; public third-party
+          # contexts then authenticate with GITHUB_TOKEN.
+          BUILDX_BAKE_GIT_AUTH_TOKEN: ${{ steps.app-token.outputs.token || github.token }}
+          GIT_AUTH_TOKEN: ${{ steps.app-token.outputs.token || github.token }}
           DOCKER_BUILD_RECORD_UPLOAD: "false"
         with:
           files: |
