@@ -19,7 +19,7 @@
 
 ## 检测原理
 
-1. GraphQL `viewer.repositories(isFork: true)` 分页列出全部 fork，一次请求同时拿到 fork 默认分支和 `parent`（上游全名及其默认分支）。REST 的 `/users/{user}/repos` 对 fork 不返回 `parent` 字段，因此选 GraphQL。
+1. GraphQL 分页列出仓库 owner（Actions 自动注入的 `GITHUB_REPOSITORY_OWNER`）名下的 fork（`user(login:)` + `isFork: true`），一次请求同时拿到 fork 默认分支和 `parent`（上游全名及其默认分支）。REST 的 `/users/{user}/repos` 对 fork 不返回 `parent` 字段，因此选 GraphQL。不能用 `viewer`（token 身份）：回退到 `GITHUB_TOKEN` 时它是 `github-actions[bot]` 的 installation token，`viewer` 解析为 bot，名下 0 个 fork，检查会静默空转。
 2. 对每个 fork 调用 REST compare 端点：
 
    ```
@@ -31,12 +31,12 @@
 
 ## 边界与失败处理
 
-- 上游被删除/重命名/转为私有时，compare 返回 404：不判定为 outdated，仅在 Job Summary 中列出 “Upstream comparison unavailable”。
+- 上游被删除/重命名/转为私有时，compare 返回 404：不判定为 outdated，仅在 Job Summary 中列出 “Upstream comparison unavailable”。瞬时网络故障（超时等无 HTTP 状态的错误）同样降级为该 fork 的 unavailable，避免单次慢查询作废整次检查；带 HTTP 状态的错误（如限流 403）仍使工作流变红。
 - fork 无默认分支（空仓库）或 parent 信息缺失时直接跳过。
 - 归档（archived）fork 仍参与检查；不想要的放入忽略列表。
 - Telegram 发送失败时输出 `::error::` 注解并以非零码退出（失败必须可见），但检查与 Summary 已经完成。
 - 所有 outdated 条目合并为一条 Telegram 消息，避免消息轰炸。
-- 权限：`FORKS_GH_TOKEN` 使用 PAT（经典或 fine-grained 均可），只需公开仓库的只读访问。工作流默认的 `GITHUB_TOKEN` 也能读公开仓库，可自行选择。注意 `GITHUB_TOKEN` 触发的工作流运行不会再触发其他工作流，对纯通知场景无影响。
+- 权限：`FORKS_GH_TOKEN` 使用 PAT（经典或 fine-grained 均可），只需公开仓库的只读访问。工作流默认的 `GITHUB_TOKEN` 也能读公开仓库（owner 从 `GITHUB_REPOSITORY_OWNER` 获取，与 token 身份无关），可自行选择。注意 `GITHUB_TOKEN` 触发的工作流运行不会再触发其他工作流，对纯通知场景无影响。
 
 ## 配置
 

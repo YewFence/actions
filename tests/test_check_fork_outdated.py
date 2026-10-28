@@ -79,7 +79,8 @@ class FakeApi:
         self.forks = forks
         self.compares = compares
 
-    def list_forks(self, token: str) -> list[dict]:
+    def list_forks(self, token: str, owner: str) -> list[dict]:
+        self.owner = owner
         return self.forks
 
     def compare(self, token: str, parent: str, parent_branch: str, fork: dict) -> dict:
@@ -103,6 +104,7 @@ def run_with_api(
     ):
         result = checker.run(
             "gh-token",
+            "me",
             ignore or [],
             telegram_token=telegram_token,
             telegram_chat_id=telegram_chat_id,
@@ -189,9 +191,78 @@ class RunTests(unittest.TestCase):
                 checker, "send_telegram", side_effect=checker.ApiError("boom")
             ),
         ):
-            result = checker.run("gh-token", [], telegram_token="t", telegram_chat_id="c")
+            result = checker.run("gh-token", "me", [], telegram_token="t", telegram_chat_id="c")
         self.assertFalse(result["notified"])
         self.assertIn("boom", result["telegram_error"])
+
+
+class ListForksTests(unittest.TestCase):
+    def test_queries_explicit_owner_not_token_identity(self) -> None:
+        """viewer (token identity) resolves to github-actions[bot] for GITHUB_TOKEN,
+        which owns zero forks. The query must target user(login: owner) instead."""
+        captured: dict = {}
+
+        def fake_request(url: str, token: str | None, payload: dict | None = None, **kwargs) -> dict:
+            captured["url"] = url
+            captured["payload"] = payload
+            return {
+                "data": {
+                    "user": {
+                        "repositories": {
+                            "nodes": [],
+                            "pageInfo": {"hasNextPage": False, "endCursor": None},
+                        }
+                    }
+                }
+            }
+
+        with patch.object(checker, "_json_request", fake_request):
+            forks = checker.list_forks("token", "YewFence")
+        self.assertEqual(forks, [])
+        self.assertIn("user(login: $owner)", captured["payload"]["query"])
+        self.assertNotIn("viewer", captured["payload"]["query"])
+        self.assertEqual(captured["payload"]["variables"]["owner"], "YewFence")
+
+    def test_paginates_until_has_next_page_is_false(self) -> None:
+        pages = [
+            {
+                "data": {
+                    "user": {
+                        "repositories": {
+                            "nodes": [{"nameWithOwner": "me/a"}],
+                            "pageInfo": {"hasNextPage": True, "endCursor": "c1"},
+                        }
+                    }
+                }
+            },
+            {
+                "data": {
+                    "user": {
+                        "repositories": {
+                            "nodes": [{"nameWithOwner": "me/b"}],
+                            "pageInfo": {"hasNextPage": False, "endCursor": None},
+                        }
+                    }
+                }
+            },
+        ]
+
+        def fake_request(url: str, token: str | None, payload: dict | None = None, **kwargs) -> dict:
+            self.assertEqual(payload["variables"]["cursor"], "c1" if len(seen) else None)
+            seen.append(payload)
+            return pages[len(seen) - 1]
+
+        seen: list[dict] = []
+        with patch.object(checker, "_json_request", fake_request):
+            forks = checker.list_forks("token", "me")
+        self.assertEqual([f["nameWithOwner"] for f in forks], ["me/a", "me/b"])
+        self.assertEqual(len(seen), 2)
+
+    def test_owner_is_passed_through_run(self) -> None:
+        api = FakeApi(forks=[], compares={})
+        result = run_with_api(api)
+        self.assertEqual(api.owner, "me")
+        self.assertEqual(result["outdated"], [])
 
 
 class CompareForkTests(unittest.TestCase):
@@ -218,6 +289,14 @@ class CompareForkTests(unittest.TestCase):
             self.assertRaises(checker.ApiError),
         ):
             checker.compare_fork("token", "upstream/repo", "main", self.fork())
+
+    def test_transient_network_error_marks_unavailable(self) -> None:
+        with patch.object(
+            checker, "_json_request", side_effect=checker.ApiError("read timed out")
+        ):
+            result = checker.compare_fork("token", "upstream/repo", "main", self.fork())
+        self.assertTrue(result["unavailable"])
+        self.assertEqual(result["behind_by"], 0)
 
     def test_url_encodes_cross_fork_basehead(self) -> None:
         captured: dict[str, str] = {}

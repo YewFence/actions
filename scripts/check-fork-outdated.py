@@ -2,7 +2,8 @@
 """Check which of your GitHub forks are behind their upstream repositories.
 
 Reads an ignore list (one repository name per line, ``#`` comments allowed),
-lists the authenticated user's forks via the GraphQL API, compares each fork's
+lists the repository owner's forks (``GITHUB_REPOSITORY_OWNER``) via the GraphQL
+API, compares each fork's
 default branch with its parent using the REST compare endpoint, optionally
 sends a Telegram message listing the outdated forks, and writes a Markdown
 summary to stdout (intended for ``GITHUB_STEP_SUMMARY``).
@@ -26,8 +27,8 @@ MAX_ERROR_DETAIL_CHARS = 200
 REQUEST_TIMEOUT_SECONDS = 30
 
 FORKS_QUERY = """
-query($cursor: String) {
-  viewer {
+query($owner: String!, $cursor: String) {
+  user(login: $owner) {
     repositories(first: 100, after: $cursor, isFork: true, ownerAffiliations: [OWNER]) {
       nodes {
         name
@@ -45,8 +46,6 @@ query($cursor: String) {
   }
 }
 """
-
-# Placeholder used by tests to validate the query payload shape.
 
 
 class ConfigError(Exception):
@@ -87,18 +86,18 @@ def _json_request(
         raise ApiError(f"request to {url} failed: {error}") from error
 
 
-def list_forks(token: str) -> list[dict]:
+def list_forks(token: str, owner: str) -> list[dict]:
     forks: list[dict] = []
     cursor: str | None = None
     while True:
         payload = _json_request(
             f"{GITHUB_API}/graphql",
             token,
-            payload={"query": FORKS_QUERY, "variables": {"cursor": cursor}},
+            payload={"query": FORKS_QUERY, "variables": {"owner": owner, "cursor": cursor}},
         )
         if payload.get("errors"):
             raise ApiError(f"GraphQL errors: {payload['errors']}")
-        repositories = payload["data"]["viewer"]["repositories"]
+        repositories = payload["data"]["user"]["repositories"]
         forks.extend(repositories["nodes"])
         page_info = repositories["pageInfo"]
         if not page_info["hasNextPage"]:
@@ -115,6 +114,11 @@ def compare_fork(token: str, parent: str, parent_branch: str, fork: dict) -> dic
         payload = _json_request(url, token)
     except ApiError as error:
         if error.status == 404:
+            return {**fork, "unavailable": True, "behind_by": 0, "ahead_by": 0}
+        if error.status is None:
+            # Transient network failure: one slow compare must not discard the
+            # whole daily check, so degrade to "unavailable" for this fork only.
+            print(f"::warning::compare failed for {fork['nameWithOwner']}: {error}", file=sys.stderr)
             return {**fork, "unavailable": True, "behind_by": 0, "ahead_by": 0}
         raise
     return {
@@ -198,13 +202,14 @@ def send_telegram(token: str, chat_id: str, text: str) -> None:
 
 def run(
     gh_token: str,
+    owner: str,
     ignore_entries: list[str],
     telegram_token: str | None,
     telegram_chat_id: str | None,
 ) -> dict:
     forks = [
         fork
-        for fork in list_forks(gh_token)
+        for fork in list_forks(gh_token, owner)
         if fork.get("parent")
         and fork.get("defaultBranchRef")
         and fork["parent"].get("defaultBranchRef")
@@ -257,11 +262,16 @@ def main() -> int:
     if not gh_token:
         raise ConfigError("missing FORKS_GH_TOKEN (or GH_TOKEN)")
 
+    owner = os.environ.get("GITHUB_REPOSITORY_OWNER")
+    if not owner:
+        raise ConfigError("missing GITHUB_REPOSITORY_OWNER (set it to the fork owner's login)")
+
     ignore_path = Path(os.environ.get("FORKS_IGNORE_FILE", "forks-ignore.txt"))
     ignore_entries = load_ignore_list(ignore_path)
 
     result = run(
         gh_token,
+        owner,
         ignore_entries,
         telegram_token=os.environ.get("TELEGRAM_BOT_TOKEN"),
         telegram_chat_id=os.environ.get("TELEGRAM_CHAT_ID"),
