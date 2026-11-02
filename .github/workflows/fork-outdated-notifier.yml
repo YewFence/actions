@@ -15,6 +15,7 @@ permissions:
 jobs:
   check-forks:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
 
     env:
       FORKS_GH_TOKEN: ${{ secrets.FORKS_GH_TOKEN || github.token }}

@@ -4,11 +4,10 @@ import argparse
 import json
 import re
 import sys
+import tomllib
 from pathlib import Path
 from typing import Any
 from urllib.parse import urlsplit
-
-import tomllib
 
 MIRROR_FIELDS = frozenset({"repository", "name", "private"})
 NAME_PATTERN = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]*$")

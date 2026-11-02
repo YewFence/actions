@@ -1,7 +1,7 @@
 #!/usr/bin/env -S uv run python
 # USAGE arg "<target>" help="Bake target to prepare"
 # USAGE arg "<directory>" help="Output directory for the release plan"
-# USAGE flag "--owner-only" help="Print the context owner without accessing source repositories"
+# USAGE flag "--source-only" help="Print the context owner and repository as JSON without accessing source repositories"
 # USAGE flag "--checkout-repository <repository>" help="Repository of the current checkout"
 # USAGE flag "--checkout-revision <revision>" help="Commit of the current checkout"
 # USAGE flag "--checkout-ref <ref>" help="Full Git ref of the current checkout"
@@ -238,6 +238,7 @@ def create_plan(
     metadata = {
         "target": target_name,
         "owner": repository.split("/", 1)[0],
+        "repository": repository.split("/", 1)[1],
         "revision": revision,
         "version": version,
         "tags": tags,
@@ -252,7 +253,7 @@ def prepare_release(
     checkout_repository: str = "",
     checkout_revision: str = "",
     checkout_ref: str = "",
-    owner_only: bool = False,
+    source_only: bool = False,
 ) -> None:
     """Resolve the configured target once and persist its build and publication inputs."""
     command = ["docker", "buildx", "bake", "--file", "docker-bake.hcl"]
@@ -263,8 +264,9 @@ def prepare_release(
     definition = json.loads(result.stdout)
     target = definition["target"][target_name]
     repository, query = parse_context(target["context"])
-    if owner_only:
-        print(repository.split("/", 1)[0])
+    if source_only:
+        owner, name = repository.split("/", 1)
+        print(json.dumps({"owner": owner, "repository": name}))
         return
     refs = read_remote_refs(repository)
     use_checkout = matches_checkout(
@@ -332,7 +334,7 @@ def main() -> int:
             os.environ.get("usage_checkout_repository", ""),
             os.environ.get("usage_checkout_revision", ""),
             os.environ.get("usage_checkout_ref", ""),
-            os.environ.get("usage_owner_only") == "true",
+            os.environ.get("usage_source_only") == "true",
         )
     except (ValueError, OSError, subprocess.CalledProcessError) as error:
         print(f"error: {error}", file=sys.stderr)

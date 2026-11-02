@@ -15,6 +15,7 @@ permissions:
 jobs:
   mirror:
     runs-on: ubuntu-latest
+    timeout-minutes: 60
 
     env:
       INFISICAL_MIRROR_BRANCH: ${{ vars.INFISICAL_MIRROR_BRANCH || 'main' }}
@@ -36,6 +37,8 @@ jobs:
 
       - name: Register log masks
         run: |
+          # Expand secrets inside the fnox child shell after decryption.
+          # shellcheck disable=SC2016
           fnox exec -- bash -c '
             for name in INFISICAL_MIRROR_URL INFISICAL_MIRROR_USERNAME INFISICAL_MIRROR_TOKEN; do
               printf "::add-mask::%s\n" "${!name}"

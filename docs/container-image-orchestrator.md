@@ -158,7 +158,7 @@ pull request 不读取 `SOPS_AGE_KEY`，不解密私有配置，也不创建 Git
 `prepare-release` 只在受信任的发布事件中运行，每个 target 执行一次：
 
 1. checkout 编排仓库并解密私有 Bake 配置。
-2. 使用 `images:prepare --owner-only` 读取 context owner，再创建 GitHub App token；App 不可用时沿用 `GITHUB_TOKEN` 访问公开源。
+2. 使用 `images:prepare --source-only` 读取 context 的 owner 和仓库名，再创建仅限该仓库、具有 `permission-contents: read` 权限的 GitHub App token；App 不可用时沿用 `GITHUB_TOKEN` 访问公开源。
 3. 运行 `mise run images:prepare <target> <directory>`，固定源码提交、解析版本、设置 labels 和 tags。
 4. 将 `bake.json` 和 `release.json` 作为保留一天的 artifact 传给各平台构建和 manifest 发布；文件不包含 token，私有 target 的计划仍包含仓库地址，与现有 matrix 日志的保护范围一致。
 
@@ -167,7 +167,7 @@ pull request 不读取 `SOPS_AGE_KEY`，不解密私有配置，也不创建 Git
 `publish` 等待发布计划准备完成，每个平台 matrix 项：
 
 1. checkout 当前编排仓库并下载该 target 的发布计划。
-2. 根据计划中的 owner 创建 GitHub App installation token。
+2. 根据计划中的 owner 和仓库名创建 GitHub App installation token，仅授权该源码仓库的 contents 读取权限。
 3. 将 `GIT_AUTH_TOKEN` 绑定到 Bake target 的 BuildKit secret。
 4. 使用计划中的固定 context 和 OCI labels，在原生 runner 构建单个平台。
 5. 以 `push-by-digest=true` 推送到 GHCR，不直接竞争标签。

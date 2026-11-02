@@ -52,6 +52,8 @@ class ImageReleaseTests(unittest.TestCase):
             metadata["tags"],
             ["ghcr.io/yewfence/app:latest", "ghcr.io/yewfence/app:2.1.2"],
         )
+        self.assertEqual(metadata["owner"], "example")
+        self.assertEqual(metadata["repository"], "app")
         self.assertEqual(metadata["labels"][prepare.VERSION], "2.1.2")
         self.assertEqual(metadata["labels"][prepare.REVISION], REVISION)
         self.assertEqual(
@@ -294,7 +296,7 @@ class ImageReleaseTests(unittest.TestCase):
             kwargs["env"]["GIT_CONFIG_VALUE_1"].startswith("AUTHORIZATION: basic ")
         )
 
-    def test_owner_probe_does_not_read_source_or_write_plan(self):
+    def test_source_probe_does_not_read_source_or_write_plan(self):
         with (
             tempfile.TemporaryDirectory() as temporary,
             patch.object(prepare.subprocess, "run") as run,
@@ -302,9 +304,15 @@ class ImageReleaseTests(unittest.TestCase):
             patch("builtins.print") as output,
         ):
             run.return_value.stdout = json.dumps(self.definition())
-            prepare.prepare_release("app", Path(temporary) / "release", owner_only=True)
+            prepare.prepare_release(
+                "app", Path(temporary) / "release", source_only=True
+            )
             refs.assert_not_called()
-            output.assert_called_once_with("example")
+            output.assert_called_once()
+            self.assertEqual(
+                json.loads(output.call_args.args[0]),
+                {"owner": "example", "repository": "app"},
+            )
             self.assertFalse((Path(temporary) / "release").exists())
 
     def test_prepare_writes_bake_and_metadata_from_one_resolution(self):

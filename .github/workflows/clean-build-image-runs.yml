@@ -1,11 +1,17 @@
 name: Clean Build Image Runs
 
 on:
+  # Only delete the completed run by ID; never check out its code or consume its artifacts.
+  # jactionlint ignore=dangerous-triggers
   workflow_run:
     workflows:
       - Build Container Images
     types:
       - completed
+
+concurrency:
+  group: clean-build-image-runs-${{ github.event.workflow_run.id }}
+  cancel-in-progress: true
 
 permissions: {}
 
@@ -14,6 +20,7 @@ jobs:
     # Keep manually dispatched runs for debugging.
     if: github.event.workflow_run.event != 'workflow_dispatch'
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     permissions:
       actions: write
     steps:

@@ -16,9 +16,9 @@ import sys
 def main() -> int:
     proc = subprocess.run(
         ["yews", "plan", "--json"],
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
+        capture_output=True,
         text=True,
+        check=False,
     )
     if proc.returncode != 0:
         print(proc.stderr.strip(), file=sys.stderr)
