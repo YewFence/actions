@@ -20,6 +20,14 @@ run = "ruff check ."
 description = "Run all unit and local integration tests"
 run = "uv run python -m unittest discover -s tests -v"
 
+[tasks."binaries:prepare"]
+description = "Prepare a binary release from binaries.toml"
+file = "scripts/prepare-binary-release.py"
+
+[tasks."binaries:build"]
+description = "Build and package one binary release platform"
+file = "scripts/build-binary-release.py"
+
 [tasks."images:prepare"]
 description = "Resolve one image's source revision, upstream version, and release tags"
 file = "scripts/prepare-image-release.py"

@@ -1,8 +1,30 @@
 {
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
   "extends": ["config:recommended"],
-  "enabledManagers": ["dockerfile", "github-actions", "mise"],
+  "enabledManagers": ["dockerfile", "github-actions", "mise", "custom.regex"],
+  "customManagers": [
+    {
+      "customType": "regex",
+      "managerFilePatterns": ["/^binaries\\.toml$/"],
+      "matchStrings": [
+        "source = \"https://github\\.com/(?<depName>[^\"\\s]+)\\.git\"\\s+tag = \"(?<currentValue>[^\"]+)\"\\s+revision = \"(?<currentDigest>[a-f0-9]{40})\""
+      ],
+      "datasourceTemplate": "git-tags",
+      "packageNameTemplate": "https://github.com/{{{depName}}}.git",
+      "versioningTemplate": "regex:^r(?<major>\\d+)\\.(?<minor>\\d+)\\.(?<patch>\\d+)$"
+    }
+  ],
   "packageRules": [
+    {
+      "matchManagers": ["custom.regex"],
+      "matchFileNames": ["binaries.toml"],
+      "groupName": "prebuilt {{depName}}"
+    },
+    {
+      "matchManagers": ["dockerfile"],
+      "matchFileNames": ["binaries/**"],
+      "groupName": "binary {{parentDir}} build image"
+    },
     {
       "matchManagers": ["github-actions"],
       "groupName": "github-actions"

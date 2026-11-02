@@ -4,6 +4,16 @@
 
 这个仓库后续可能会继续加入别的零散自动化任务，所以每个工作流都会尽量独立配置，避免互相影响。
 
+## 预编译工具
+
+预编译命令行工具的上游版本和源码 commit 锁定在 [binaries.toml](binaries.toml)，由 Renovate 自动提出升级。`.github/workflows/build-binaries.yml` 使用 BuildKit 容器编译并打包，在 main 分支相关文件变更时自动创建 GitHub Release，也支持手动触发并选择发布，通过 packslip 签名供 mise 验证安装。Josh 首批提供 Linux x86_64 和 ARM64 的 `josh`、`josh-filter`：
+
+```bash
+mise use -g packslip:github.com/YewFence/actions/josh
+```
+
+Josh 需要 Git 命令在 `PATH` 中；`josh changes pull` 要求 Git 2.41 或更高版本。
+
 ## 设计文档
 
 - [声明式容器镜像编排器](docs/container-image-orchestrator.md)

@@ -1,0 +1,17 @@
+[tools.josh]
+source = "https://github.com/josh-project/josh.git"
+tag = "r26.08.28"
+revision = "ecf748d20ab9c0450b5c71b8023e7ad7ce08449e"
+version_pattern = '^r(?P<major>\d+)\.(?P<minor>\d+)\.(?P<patch>\d+)$'
+commands = ["josh", "josh-filter"]
+notes = """Unofficial prebuilt binaries of Josh.\n\nUpstream tag: `{source_tag}`\n\nUpstream commit: `{revision}`\n\nCommands: {commands}\n\nLinux GNU builds require glibc 2.36 or newer. Josh commands also need Git on PATH; `josh changes pull` needs Git 2.41 or newer."""
+
+[[tools.josh.platforms]]
+platform = "linux/amd64"
+target = "x86_64-unknown-linux-gnu"
+runner = "ubuntu-24.04"
+
+[[tools.josh.platforms]]
+platform = "linux/arm64"
+target = "aarch64-unknown-linux-gnu"
+runner = "ubuntu-24.04-arm"
