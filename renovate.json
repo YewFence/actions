@@ -1,5 +1,20 @@
 {
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
   "extends": ["config:recommended"],
-  "enabledManagers": ["dockerfile", "github-actions", "mise"]
+  "enabledManagers": ["dockerfile", "github-actions", "mise"],
+  "packageRules": [
+    {
+      "matchManagers": ["github-actions"],
+      "groupName": "github-actions"
+    },
+    {
+      "matchManagers": ["mise"],
+      "matchFileNames": ["mise.toml"],
+      "groupName": "repo mise tools"
+    },
+    {
+      "matchFileNames": ["images/**"],
+      "groupName": "image {{parentDir}}"
+    }
+  ]
 }
