@@ -1,8 +1,10 @@
-# Forgejo 默认分支镜像与历史归档设计
+# Forgejo 默认分支镜像与历史归档
+
+工作流：[`.github/workflows/mirror-repositories.yml`](../.github/workflows/mirror-repositories.yml)
 
 ## 状态
 
-- 阶段：待实现
+- 阶段：已实现（`fj` 集成边界已上线验证）
 - 目标仓库：`YewFence/actions`
 - 执行器：GitHub Actions
 - 目标服务：Forgejo HTTPS Git 远端
@@ -376,6 +378,29 @@ summary 渲染测试使用代表性 matrix 与同步结果 JSON，覆盖计划�
 - `FORGEJO_HOST` 和 `FORGEJO_TOKEN` 环境变量
 
 上线前必须在一次手动触发中使用专用测试仓库验证：不存在仓库的查询与创建、HTTPS Git 认证、默认分支修改以及已有仓库查询。验证不能在 Pull Request 工作流中运行。
+
+## 运维
+
+### 需要配置的配置项
+
+| 名称 | 类型 | 含义 |
+| --- | --- | --- |
+| `FORGEJO_HOST` | Variable 优先，Secret 兕底 | Forgejo 实例 HTTPS 根 URL |
+| `FORGEJO_USERNAME` | Variable 优先，Secret 兕底 | 目标仓库所属用户名，也是 Git 认证用户名 |
+| `FORGEJO_TOKEN` | Secret | `fj` API 调用和 Git 推送使用的 token |
+
+`FORGEJO_TOKEN` 所属账户必须与 `FORGEJO_USERNAME` 相同，并至少拥有该账户下仓库的创建、修改和推送权限。
+
+### 常用操作
+
+- 手动同步全部镜像：Actions 页面手动触发，`name` 留空。
+- 手动同步单个镜像：手动触发时填 `name`（清单中声明的名称）。
+- 新增镜像：在 `mirrors.toml` 追加一个 `[[mirrors]]` 块，push 后工作流自动同步。
+- 查看结果：每个 mirror job 的 summary 记录来源、目标、分支、新旧 SHA、归档引用和最终操作。
+
+### 告警语义
+
+非 fast-forward 更新和默认分支变更即使同步成功也让 job 失败，以 GitHub Actions 失败通知作为唯一告警渠道；收到告警后手动触发即可（下一轮会重新读取实际远端状态）。
 
 ## 实施顺序
 

@@ -1,4 +1,6 @@
-# 声明式容器镜像编排器设计
+# 声明式容器镜像编排器
+
+工作流：[`.github/workflows/build-images.yml`](../.github/workflows/build-images.yml)
 
 ## 状态
 

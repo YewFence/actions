@@ -1,4 +1,6 @@
-# Fork Outdated Notifier 设计
+# Fork Outdated Notifier
+
+工作流：[`.github/workflows/fork-outdated-notifier.yml`](../.github/workflows/fork-outdated-notifier.yml)
 
 ## 状态
 
@@ -47,6 +49,18 @@
 ## 频率建议
 
 默认每天一次（`cron: "17 3 * * *"`，UTC）。GitHub 对定时工作流在负载高时会延迟甚至跳过运行，对通知场景可接受。
+
+## 运维
+
+### 需要配置的 secrets
+
+`TELEGRAM_BOT_TOKEN` 是 Telegram Bot 的 token（向 @BotFather 申请），`TELEGRAM_CHAT_ID` 是接收消息的聊天 ID。两个都是可选的；不配置时只输出 Job Summary，不发送消息。
+
+`FORKS_GH_TOKEN` 是用于调用 GitHub API 的 token（可选）。不配置时使用工作流自动注入的 `GITHUB_TOKEN`；如果 fork 数量较多或希望速率限制更宽松，可以配置一个只需公开仓库只读权限的 PAT。
+
+### 忽略列表
+
+仓库根目录的 [forks-ignore.txt](../forks-ignore.txt) 每行列出一个不参与检查的仓库，支持 `owner/repo`（推荐）或裸仓库名，`#` 后内容为注释。
 
 ## 非目标
 
