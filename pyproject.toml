@@ -1,0 +1,7 @@
+[project]
+name = "actions-automation"
+version = "0.0.0"
+requires-python = ">=3.11"
+dependencies = [
+    "dockerfile-parse==2.0.1",
+]

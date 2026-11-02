@@ -20,6 +20,14 @@ run = "ruff check ."
 description = "Run all unit and local integration tests"
 run = "uv run python -m unittest discover -s tests -v"
 
+[tasks."images:prepare"]
+description = "Resolve one image's source revision, upstream version, and release tags"
+file = "scripts/prepare-image-release.py"
+
+[tasks."images:manifest"]
+description = "Publish the prepared release tags on one multi-platform manifest"
+file = "scripts/publish-image-manifest.py"
+
 [tasks.mirror-render]
 description = "Validate mirrors.toml and render the mirror matrix"
 run = "uv run python scripts/render-mirror-matrix.py"

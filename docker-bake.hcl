@@ -8,7 +8,8 @@ target "restic-exporter" {
   platforms  = ["linux/amd64", "linux/arm64"]
 
   labels = {
-    "org.opencontainers.image.source" = "https://github.com/YewFence/actions"
+    "dev.yewfence.image.version-source" = "dockerfile"
+    "org.opencontainers.image.source"  = "https://github.com/YewFence/actions"
   }
 }
 
@@ -18,7 +19,8 @@ target "resticprofile-runner" {
   platforms  = ["linux/amd64", "linux/arm64"]
 
   labels = {
-    "org.opencontainers.image.source" = "https://github.com/YewFence/actions"
+    "dev.yewfence.image.version-source" = "dockerfile"
+    "org.opencontainers.image.source"  = "https://github.com/YewFence/actions"
   }
 }
 

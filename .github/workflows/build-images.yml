@@ -12,6 +12,11 @@ on:
       - main
     paths:
       - docker-bake.hcl
+      - scripts/prepare-image-release.py
+      - scripts/publish-image-manifest.py
+      - tests/test_image_release.py
+      - pyproject.toml
+      - uv.lock
       - images/**
       - private-repo-bake.hcl.bin
       - .sops.yaml
@@ -22,6 +27,11 @@ on:
   pull_request:
     paths:
       - docker-bake.hcl
+      - scripts/prepare-image-release.py
+      - scripts/publish-image-manifest.py
+      - tests/test_image_release.py
+      - pyproject.toml
+      - uv.lock
       - images/**
       - private-repo-bake.hcl.bin
       - .sops.yaml
@@ -170,9 +180,75 @@ jobs:
             ${{ matrix.target }}.platform=${{ matrix.platforms }}
             ${{ matrix.target }}.output=type=cacheonly
 
-  publish:
+  prepare-release:
     if: github.event_name != 'pull_request'
     needs: check
+    permissions:
+      contents: read
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      max-parallel: 4
+      matrix:
+        include: ${{ fromJSON(needs.check.outputs.targets) }}
+    name: Prepare release ${{ matrix.target }}
+
+    steps:
+      - name: Check out orchestrator
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up mise
+        uses: jdx/mise-action@3c2e0cf82a5b2e5249f0d3635a4d83d0ae861518 # v4.2.5
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@37fe631027851001ddb9b187196cc803df7f5f0e # v4.3.0
+
+      - name: Decrypt private Bake config
+        env:
+          SOPS_AGE_KEY: ${{ secrets.SOPS_AGE_KEY }}
+        run: yews decrypt
+
+      - name: Identify source owner
+        id: source
+        env:
+          TARGET: ${{ matrix.target }}
+        run: |
+          owner="$(mise run images:prepare "$TARGET" "$RUNNER_TEMP/release" --owner-only)"
+          printf 'owner=%s\n' "$owner" >> "$GITHUB_OUTPUT"
+
+      - name: Create GitHub App token
+        id: app-token
+        continue-on-error: true
+        uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
+        with:
+          client-id: ${{ vars.SOURCE_APP_CLIENT_ID }}
+          private-key: ${{ secrets.SOURCE_APP_PRIVATE_KEY }}
+          owner: ${{ steps.source.outputs.owner }}
+
+      - name: Prepare pinned release plan
+        env:
+          TARGET: ${{ matrix.target }}
+          GH_TOKEN: ${{ steps.app-token.outputs.token || github.token }}
+        run: >-
+          mise run images:prepare "$TARGET" "$RUNNER_TEMP/release"
+          --checkout-repository "$GITHUB_REPOSITORY"
+          --checkout-revision "$GITHUB_SHA"
+          --checkout-ref "$GITHUB_REF"
+
+      - name: Upload release plan
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: image-release-${{ matrix.target }}
+          path: ${{ runner.temp }}/release
+          if-no-files-found: error
+          retention-days: 1
+
+  publish:
+    if: github.event_name != 'pull_request'
+    needs: [check, prepare-release]
     permissions:
       contents: read
       packages: write
@@ -197,37 +273,17 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
 
-      - name: Decrypt private Bake config
-        env:
-          SOPS_AGE_KEY: ${{ secrets.SOPS_AGE_KEY }}
-        run: yews decrypt
+      - name: Download release plan
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: image-release-${{ matrix.target }}
+          path: ${{ runner.temp }}/release
 
-      - name: Materialize Bake overrides
-        id: bake-files
-        env:
-          TARGET: ${{ matrix.target }}
+      - name: Read source owner
+        id: release
         run: |
-          set -euo pipefail
-          override="$RUNNER_TEMP/private-repo-bake.hcl"
-          if [[ -f private-repo-bake.hcl ]]; then
-            cp private-repo-bake.hcl "$override"
-          else
-            : > "$override"
-          fi
-          printf 'target "%s" {\n  secret = ["id=GIT_AUTH_TOKEN,env=GIT_AUTH_TOKEN"]\n}\n' "$TARGET" >> "$override"
-          context="$(docker buildx bake \
-            --file docker-bake.hcl \
-            --file "$override" \
-            --print "$TARGET" |
-            jq -er --arg target "$TARGET" '.target[$target].context')"
-          owner="$GITHUB_REPOSITORY_OWNER"
-          if [[ "$context" =~ ^https://github\.com/([^/]+)/ ]]; then
-            owner="${BASH_REMATCH[1]}"
-          fi
-          {
-            printf 'override=%s\n' "$override"
-            printf 'owner=%s\n' "$owner"
-          } >> "$GITHUB_OUTPUT"
+          owner="$(jq -er '.owner' "$RUNNER_TEMP/release/release.json")"
+          printf 'owner=%s\n' "$owner" >> "$GITHUB_OUTPUT"
 
       - name: Create GitHub App token
         id: app-token
@@ -239,7 +295,7 @@ jobs:
         with:
           client-id: ${{ vars.SOURCE_APP_CLIENT_ID }}
           private-key: ${{ secrets.SOURCE_APP_PRIVATE_KEY }}
-          owner: ${{ steps.bake-files.outputs.owner }}
+          owner: ${{ steps.release.outputs.owner }}
 
       - name: Log in to GHCR
         uses: docker/login-action@81c6f93d4bc991e510b342a00b419b3bb4efc5c6 # v4.7.0
@@ -259,13 +315,12 @@ jobs:
           GIT_AUTH_TOKEN: ${{ steps.app-token.outputs.token || github.token }}
           DOCKER_BUILD_RECORD_UPLOAD: "false"
         with:
-          files: |
-            docker-bake.hcl
-            cwd://${{ steps.bake-files.outputs.override }}
+          files: cwd://${{ runner.temp }}/release/bake.json
           targets: ${{ matrix.target }}
           provenance: false
           set: |
             ${{ matrix.target }}.platform=${{ matrix.platforms }}
+            ${{ matrix.target }}.secret=id=GIT_AUTH_TOKEN,env=GIT_AUTH_TOKEN
             ${{ matrix.target }}.output=type=registry,name=ghcr.io/yewfence/${{ matrix.target }},push-by-digest=true,name-canonical=true,push=true
             ${{ matrix.target }}.cache-from=type=gha,scope=${{ matrix.target }}-${{ matrix.platforms }}
             ${{ matrix.target }}.cache-to=type=gha,mode=max,scope=${{ matrix.target }}-${{ matrix.platforms }}
@@ -309,11 +364,25 @@ jobs:
     name: Publish manifest ${{ matrix.target }}
 
     steps:
+      - name: Check out orchestrator
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up mise
+        uses: jdx/mise-action@3c2e0cf82a5b2e5249f0d3635a4d83d0ae861518 # v4.2.5
+
+      - name: Download release plan
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: image-release-${{ matrix.target }}
+          path: ${{ runner.temp }}/release
+
       - name: Download image digests
         uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           pattern: image-digest-*-${{ matrix.target }}
-          path: ${{ runner.temp }}/digests
+          path: ${{ runner.temp }}/release/digests
           merge-multiple: true
 
       - name: Set up Docker Buildx
@@ -327,34 +396,16 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Create multi-platform manifest
-        id: manifest
-        env:
-          TARGET: ${{ matrix.target }}
-        run: |
-          set -euo pipefail
-          shopt -s nullglob
-          digest_files=("$RUNNER_TEMP/digests"/*)
-          if (( ${#digest_files[@]} == 0 )); then
-            printf 'No image digests found for %s\n' "$TARGET" >&2
-            exit 1
-          fi
-
-          sources=()
-          for digest_file in "${digest_files[@]}"; do
-            sources+=("ghcr.io/yewfence/${TARGET}@sha256:$(basename "$digest_file")")
-          done
-
-          image="ghcr.io/yewfence/${TARGET}:latest"
-          docker buildx imagetools create --tag "$image" "${sources[@]}"
-          digest="$(docker buildx imagetools inspect "$image" --format '{{.Manifest.Digest}}')"
-          printf 'digest=%s\n' "$digest" >> "$GITHUB_OUTPUT"
+        run: mise run images:manifest "$RUNNER_TEMP/release"
 
   cleanup:
     if: github.event_name != 'pull_request'
     needs: [check, publish-manifest]
     permissions:
+      contents: read
       packages: write
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     strategy:
       fail-fast: false
       max-parallel: 4
@@ -363,12 +414,11 @@ jobs:
     name: Cleanup ${{ matrix.target }}
 
     steps:
-      - name: Delete old untagged image versions
-        uses: actions/delete-package-versions@e5bc658cc4c965c472efe991f8beea3981499c55 # v5.0.0
+      - name: Delete old unreferenced image versions
+        uses: snok/container-retention-policy@d3bdcf5ce9b05f685154e4a16c39233b245e3d53 # v3.1.0
         with:
-          owner: yewfence
-          package-name: ${{ matrix.target }}
-          package-type: container
-          min-versions-to-keep: 10
-          delete-only-untagged-versions: true
+          account: user
           token: ${{ secrets.GITHUB_TOKEN }}
+          image-names: ${{ matrix.target }}
+          tag-selection: untagged
+          cut-off: 7d
