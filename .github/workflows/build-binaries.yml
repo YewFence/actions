@@ -40,7 +40,7 @@ defaults:
 
 jobs:
   prepare:
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     timeout-minutes: 10
     outputs:
       matrix: ${{ steps.plan.outputs.matrix }}
@@ -102,7 +102,7 @@ jobs:
       (github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.publish)) &&
       github.ref == format('refs/heads/{0}', github.event.repository.default_branch)
     needs: [prepare, build]
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     timeout-minutes: 15
     permissions:
       contents: read
@@ -132,7 +132,7 @@ jobs:
 
   publish:
     needs: [prepare, sign]
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     timeout-minutes: 10
     permissions:
       contents: write
