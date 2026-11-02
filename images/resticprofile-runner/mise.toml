@@ -2,7 +2,7 @@
 # 版本与下载 sha256 由 mise.lock 锁定；升级时先改这里的版本号，再在本目录运行 `mise lock`。
 # rclone 不在此管理：上游镜像自带的版本即备份链路验证版本，不再覆盖。
 [tools]
-"github:aptible/supercronic" = "0.2.49"
+"github:aptible/supercronic" = "v0.2.51"
 jq = "1.8.2"
 
 [settings]
