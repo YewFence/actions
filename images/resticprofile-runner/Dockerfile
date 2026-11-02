@@ -22,7 +22,7 @@ RUN mise trust \
     && cp "$(mise which supercronic)" /out/supercronic \
     && cp "$(mise which jq)" /out/jq
 
-FROM creativeprojects/resticprofile:0.33.1@sha256:c8afc532eb7693908ca8f0f0a791f632098268ec8ab1b4b63af1a642894a6ad7 AS final
+FROM creativeprojects/resticprofile:0.33.1@sha256:11ecefbac151a2e9c2929a0190fde91f5f750f6c3a3f529dd708043d51d92414 AS final
 
 COPY --from=mise-tools /out/supercronic /usr/local/bin/supercronic
 COPY --from=mise-tools /out/jq /usr/local/bin/jq
