@@ -47,43 +47,50 @@ url_api = "https://api.github.com/repos/jdx/fnox/releases/assets/595127695"
 provenance = "github-attestations"
 
 [[tools."github:YewFence/YewSeal"]]
-version = "0.20.0"
+version = "0.25.0"
 backend = "github:YewFence/YewSeal"
 
 [tools."github:YewFence/YewSeal"."platforms.linux-arm64"]
-checksum = "sha256:8273ad00014a92a667fdab1b20087063ac3a441d48afe4ba8ad984ac9780fb76"
-url = "https://github.com/YewFence/YewSeal/releases/download/v0.20.0/yews-v0.20.0-linux-arm64.tar.gz"
-url_api = "https://api.github.com/repos/YewFence/YewSeal/releases/assets/615184781"
+checksum = "sha256:4e4bbf0401991e3f426aef7642a3bdff97cdaf28aa4367a34cc047cf7baf2e12"
+checksum_source = "mise-versions"
+url = "https://github.com/YewFence/YewSeal/releases/download/v0.25.0/yews-v0.25.0-linux-arm64.tar.gz"
+url_api = "https://api.github.com/repos/YewFence/YewSeal/releases/assets/643897507"
 
 [tools."github:YewFence/YewSeal"."platforms.linux-arm64-musl"]
-checksum = "sha256:8273ad00014a92a667fdab1b20087063ac3a441d48afe4ba8ad984ac9780fb76"
-url = "https://github.com/YewFence/YewSeal/releases/download/v0.20.0/yews-v0.20.0-linux-arm64.tar.gz"
-url_api = "https://api.github.com/repos/YewFence/YewSeal/releases/assets/615184781"
+checksum = "sha256:4e4bbf0401991e3f426aef7642a3bdff97cdaf28aa4367a34cc047cf7baf2e12"
+checksum_source = "mise-versions"
+url = "https://github.com/YewFence/YewSeal/releases/download/v0.25.0/yews-v0.25.0-linux-arm64.tar.gz"
+url_api = "https://api.github.com/repos/YewFence/YewSeal/releases/assets/643897507"
 
 [tools."github:YewFence/YewSeal"."platforms.linux-x64"]
-checksum = "sha256:d2f89725ec8bd8b0d207bad6073440b032da5133c35c1ed7378bd72992a9e0f7"
-url = "https://github.com/YewFence/YewSeal/releases/download/v0.20.0/yews-v0.20.0-linux-amd64.tar.gz"
-url_api = "https://api.github.com/repos/YewFence/YewSeal/releases/assets/615184777"
+checksum = "sha256:0f889debe0c47871fb5ad8b808b4c546a8695df1d7d24431b9febbf3d7d51d90"
+checksum_source = "mise-versions"
+url = "https://github.com/YewFence/YewSeal/releases/download/v0.25.0/yews-v0.25.0-linux-amd64.tar.gz"
+url_api = "https://api.github.com/repos/YewFence/YewSeal/releases/assets/643897503"
 
 [tools."github:YewFence/YewSeal"."platforms.linux-x64-musl"]
-checksum = "sha256:d2f89725ec8bd8b0d207bad6073440b032da5133c35c1ed7378bd72992a9e0f7"
-url = "https://github.com/YewFence/YewSeal/releases/download/v0.20.0/yews-v0.20.0-linux-amd64.tar.gz"
-url_api = "https://api.github.com/repos/YewFence/YewSeal/releases/assets/615184777"
+checksum = "sha256:0f889debe0c47871fb5ad8b808b4c546a8695df1d7d24431b9febbf3d7d51d90"
+checksum_source = "mise-versions"
+url = "https://github.com/YewFence/YewSeal/releases/download/v0.25.0/yews-v0.25.0-linux-amd64.tar.gz"
+url_api = "https://api.github.com/repos/YewFence/YewSeal/releases/assets/643897503"
 
 [tools."github:YewFence/YewSeal"."platforms.macos-arm64"]
-checksum = "sha256:22a9b76259921b63dc5d2df08a6f0eb1f9806c9c710957f388a5149e2a1c1e42"
-url = "https://github.com/YewFence/YewSeal/releases/download/v0.20.0/yews-v0.20.0-darwin-arm64.tar.gz"
-url_api = "https://api.github.com/repos/YewFence/YewSeal/releases/assets/615184780"
+checksum = "sha256:f4db0814b1011f5bbfadc216b49405c3420f5e4eb319fe54ea288d7ff877991c"
+checksum_source = "mise-versions"
+url = "https://github.com/YewFence/YewSeal/releases/download/v0.25.0/yews-v0.25.0-darwin-arm64.tar.gz"
+url_api = "https://api.github.com/repos/YewFence/YewSeal/releases/assets/643897518"
 
 [tools."github:YewFence/YewSeal"."platforms.macos-x64"]
-checksum = "sha256:422dd306d082b393b0084af656ed237f281b517bbf35ac3baeb7f1d766a08fcc"
-url = "https://github.com/YewFence/YewSeal/releases/download/v0.20.0/yews-v0.20.0-darwin-amd64.tar.gz"
-url_api = "https://api.github.com/repos/YewFence/YewSeal/releases/assets/615184779"
+checksum = "sha256:bd2c70efdc57862dca5fc985b56fc556c5efdcc2ba3e13872f9f9e86c0bda117"
+checksum_source = "mise-versions"
+url = "https://github.com/YewFence/YewSeal/releases/download/v0.25.0/yews-v0.25.0-darwin-amd64.tar.gz"
+url_api = "https://api.github.com/repos/YewFence/YewSeal/releases/assets/643897513"
 
 [tools."github:YewFence/YewSeal"."platforms.windows-x64"]
-checksum = "sha256:57ca8649a1c9e8aca25576f98c7114f7d28ae3fe4531ed83bfb39c9f257ba292"
-url = "https://github.com/YewFence/YewSeal/releases/download/v0.20.0/yews-v0.20.0-windows-amd64.zip"
-url_api = "https://api.github.com/repos/YewFence/YewSeal/releases/assets/615184785"
+checksum = "sha256:e40e785f36316f5cba782aaa3b64efcdb36dacd2b889b2b1a8e756b3f70a4893"
+checksum_source = "mise-versions"
+url = "https://github.com/YewFence/YewSeal/releases/download/v0.25.0/yews-v0.25.0-windows-amd64.zip"
+url_api = "https://api.github.com/repos/YewFence/YewSeal/releases/assets/643897501"
 
 [[tools."github:YewFence/forgejo-cli"]]
 version = "2.2.0"
