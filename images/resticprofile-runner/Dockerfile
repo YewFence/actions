@@ -6,7 +6,7 @@
 # rclone 使用上游镜像自带版本，不由 mise 覆盖。
 # 消费方：services 仓库的 edge/resticprofile 与 stump/backup-ops。
 FROM alpine:3.24@sha256:be2656061b536c1883c4034790e21d0a09c5aaaf51968b89368a3c0371ea2c9a AS mise-tools
-COPY --from=ghcr.io/jdx/mise:2026.10.25@sha256:91417f41840316b7c5da6854bef393eccea4546ae70f8baf0803e0e94287b68d /usr/local/bin/mise /usr/local/bin/mise
+COPY --from=ghcr.io/jdx/mise:2026.11.0@sha256:6e05da4113a812cc8ac72b21a38889d019fb0f97df6ce8075c0de98d1cf48cc4 /usr/local/bin/mise /usr/local/bin/mise
 # ca-certificates 的版本随 digest 锁定的 alpine 基础镜像走，无需单独 pin
 # hadolint ignore=DL3018
 RUN apk add --no-cache ca-certificates
