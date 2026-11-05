@@ -16,6 +16,13 @@
   ],
   "packageRules": [
     {
+      "description": "Point deb lookups for pgbackrest at the pgdg bookworm repository",
+      "matchManagers": ["dockerfile"],
+      "matchDatasources": ["deb"],
+      "matchFileNames": ["images/postgres-pgbackrest/**"],
+      "registryUrls": ["http://apt.postgresql.org/pub/repos/apt?suite=bookworm-pgdg&components=main&binaryArch=amd64"]
+    },
+    {
       "matchManagers": ["custom.regex"],
       "matchFileNames": ["binaries.toml"],
       "groupName": "prebuilt {{depName}}"

@@ -2,6 +2,17 @@ group "default" {
   targets = ["agent-vault", "resticprofile-runner", "restic-exporter", "mltb"]
 }
 
+target "postgres-pgbackrest" {
+  context    = "https://github.com/YewFence/actions.git?branch=main&subdir=images/postgres-pgbackrest"
+  dockerfile = "Dockerfile"
+  platforms  = ["linux/amd64", "linux/arm64"]
+
+  labels = {
+    "dev.yewfence.image.version-source" = "dockerfile"
+    "org.opencontainers.image.source"  = "https://github.com/YewFence/actions"
+  }
+}
+
 target "restic-exporter" {
   context    = "https://github.com/YewFence/actions.git?branch=main&subdir=images/restic-exporter"
   dockerfile = "Dockerfile"

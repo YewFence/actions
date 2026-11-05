@@ -1,0 +1,9 @@
+# postgres-pgbackrest 镜像的构建期工具清单，由 Dockerfile 的 mise 阶段安装。
+# 版本与下载 sha256 由 mise.lock 锁定；升级时先改这里的版本号，再在本目录运行 `mise lock`。
+# 镜像只在 Debian(amd64/arm64) 上构建，pgbackrest deb 亦来自 pgdg 官方源。
+[tools]
+"github:aptible/supercronic" = "v0.2.51"
+
+[settings]
+# supercronic 是静态 Go 二进制，musl 版在 glibc Debian 上同样可执行。
+lockfile_platforms = ["linux-x64-musl", "linux-arm64-musl"]
