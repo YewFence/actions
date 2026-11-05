@@ -24,7 +24,7 @@ VERSION_SOURCE = "dev.yewfence.image.version-source"
 VERSION = "org.opencontainers.image.version"
 REVISION = "org.opencontainers.image.revision"
 BASE_NAME = "org.opencontainers.image.base.name"
-RELEASE_TAG = re.compile(r"v?(\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?)")
+RELEASE_TAG = re.compile(r"v?(\d+\.\d+(?:\.\d+)?(?:-[0-9A-Za-z.-]+)?)")
 
 
 def read_remote_refs(repository: str) -> dict[str, str]:
@@ -236,21 +236,16 @@ def create_plan(
     target["context"] = pin_context(target["context"], query, revision)
     labels = target.setdefault("labels", {})
     source = labels.get(VERSION_SOURCE)
-    if source is None or source == "dockerfile":
-        if source is not None:
-            if dockerfile is None:
-                raise ValueError(
-                    "Dockerfile is required for the dockerfile version source"
-                )
-            if source.startswith("dockerfile:"):
-                stage = source.split(":", 1)[1]
-                if not stage:
-                    raise ValueError("version source stage name must not be empty")
-                target["version_source_stage"] = stage
-            version, base_image = dockerfile_version(dockerfile, target)
-            labels[BASE_NAME] = base_image
-        else:
-            version = exact_version(query, refs, revision)
+    if source is None:
+        version = exact_version(query, refs, revision)
+    elif source == "dockerfile" or source.startswith("dockerfile:"):
+        if dockerfile is None:
+            raise ValueError("Dockerfile is required for the dockerfile version source")
+        stage = source.partition(":")[2]
+        if stage:
+            target["version_source_stage"] = stage
+        version, base_image = dockerfile_version(dockerfile, target)
+        labels[BASE_NAME] = base_image
     else:
         raise ValueError(f"unsupported version source: {source}")
     labels[REVISION] = revision

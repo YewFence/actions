@@ -265,6 +265,17 @@ class ImageReleaseTests(unittest.TestCase):
             ("1.2.3", "example/app:1.2.3"),
         )
 
+    def test_two_segment_release_tags_are_accepted(self):
+        self.assertEqual(
+            prepare.dockerfile_version(
+                "FROM postgres:18.6 AS base\nFROM base\n",
+                {"version_source_stage": "base"},
+            )[0],
+            "18.6",
+        )
+        self.assertEqual(prepare.RELEASE_TAG.fullmatch("3.24").group(1), "3.24")
+        self.assertEqual(prepare.RELEASE_TAG.fullmatch("1.2.3-1.pgdg12+1"), None)
+
     def test_version_source_stage_must_exist_and_be_versioned(self):
         with self.assertRaisesRegex(ValueError, "version source stage not found"):
             prepare.dockerfile_version("FROM example/app:1.2.3 AS base\n", {"version_source_stage": "missing"})
