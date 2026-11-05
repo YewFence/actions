@@ -8,7 +8,7 @@ target "postgres-pgbackrest" {
   platforms  = ["linux/amd64", "linux/arm64"]
 
   labels = {
-    "dev.yewfence.image.version-source" = "dockerfile"
+    "dev.yewfence.image.version-source" = "dockerfile:base"
     "org.opencontainers.image.source"  = "https://github.com/YewFence/actions"
   }
 }

@@ -256,6 +256,24 @@ class ImageReleaseTests(unittest.TestCase):
             ("1.2.3", "example/app:1.2.3"),
         )
 
+    def test_version_source_stage_reads_that_stage_image(self):
+        self.assertEqual(
+            prepare.dockerfile_version(
+                "FROM example/app:1.2.3 AS base\nRUN nothing\nFROM alpine:3.20\nCOPY --from=base /app /app\n",
+                {"version_source_stage": "base"},
+            ),
+            ("1.2.3", "example/app:1.2.3"),
+        )
+
+    def test_version_source_stage_must_exist_and_be_versioned(self):
+        with self.assertRaisesRegex(ValueError, "version source stage not found"):
+            prepare.dockerfile_version("FROM example/app:1.2.3 AS base\n", {"version_source_stage": "missing"})
+        with self.assertRaisesRegex(ValueError, "explicit version tag"):
+            prepare.dockerfile_version(
+                "FROM scratch AS tools\nFROM example/app:1.2.3 AS base\n",
+                {"version_source_stage": "tools"},
+            )
+
     def test_nonversioned_base_image_is_not_mislabeled(self):
         for image in (
             "example/app:latest",

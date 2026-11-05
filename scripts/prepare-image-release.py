@@ -146,7 +146,13 @@ def exact_version(
 
 
 def dockerfile_version(content: str, target: dict) -> tuple[str, str]:
-    """Read the final upstream image with the Dockerfile parser, including ARG defaults."""
+    """Read the upstream version image from the Dockerfile parser, including ARG defaults.
+
+    The version source stage is selected with ``version-source`` in ``target``:
+    ``None`` keeps the legacy behavior of reading the final ``FROM`` instruction,
+    while an explicit stage name reads the ``FROM`` line that declares that stage.
+    """
+    stage = target.get("version_source_stage")
     parser = DockerfileParser(
         fileobj=io.BytesIO(content.encode()),
         build_args={
@@ -156,7 +162,18 @@ def dockerfile_version(content: str, target: dict) -> tuple[str, str]:
         },
     )
     image = parser.baseimage
-    if target.get("target"):
+    if stage is not None:
+        from_lines = [
+            item["value"] for item in parser.structure if item["instruction"] == "FROM"
+        ]
+        for line in from_lines:
+            parts = line.split()
+            if len(parts) >= 3 and parts[-2].upper() == "AS" and parts[-1] == stage:
+                image = " ".join(parts[:-2])
+                break
+        else:
+            raise ValueError(f"version source stage not found in Dockerfile: {stage}")
+    elif target.get("target"):
         final_from = [
             item["value"] for item in parser.structure if item["instruction"] == "FROM"
         ][-1]
@@ -219,13 +236,21 @@ def create_plan(
     target["context"] = pin_context(target["context"], query, revision)
     labels = target.setdefault("labels", {})
     source = labels.get(VERSION_SOURCE)
-    if source == "dockerfile":
-        if dockerfile is None:
-            raise ValueError("Dockerfile is required for the dockerfile version source")
-        version, base_image = dockerfile_version(dockerfile, target)
-        labels[BASE_NAME] = base_image
-    elif source is None:
-        version = exact_version(query, refs, revision)
+    if source is None or source == "dockerfile":
+        if source is not None:
+            if dockerfile is None:
+                raise ValueError(
+                    "Dockerfile is required for the dockerfile version source"
+                )
+            if source.startswith("dockerfile:"):
+                stage = source.split(":", 1)[1]
+                if not stage:
+                    raise ValueError("version source stage name must not be empty")
+                target["version_source_stage"] = stage
+            version, base_image = dockerfile_version(dockerfile, target)
+            labels[BASE_NAME] = base_image
+        else:
+            version = exact_version(query, refs, revision)
     else:
         raise ValueError(f"unsupported version source: {source}")
     labels[REVISION] = revision
@@ -235,6 +260,7 @@ def create_plan(
     if version:
         tags.append(f"{image}:{version}")
     target.pop("tags", None)
+    target.pop("version_source_stage", None)
     metadata = {
         "target": target_name,
         "owner": repository.split("/", 1)[0],
@@ -274,7 +300,7 @@ def prepare_release(
     )
     revision = checkout_revision if use_checkout else resolve_revision(query, refs)
     dockerfile = None
-    if target.get("labels", {}).get(VERSION_SOURCE) == "dockerfile":
+    if str(target.get("labels", {}).get(VERSION_SOURCE, "")).startswith("dockerfile"):
         if "dockerfile-inline" in target:
             dockerfile = target["dockerfile-inline"]
         else:
