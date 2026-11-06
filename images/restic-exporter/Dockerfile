@@ -3,8 +3,8 @@
 # rclone 的版本由同目录 mise.toml + mise.lock 锁定：构建时在 mise-tools 阶段安装，
 # 最终镜像只接收一个静态二进制，mise 本体不进入镜像。
 # 消费方：services 仓库的 stump/backup-ops。
-FROM alpine:3.24@sha256:be2656061b536c1883c4034790e21d0a09c5aaaf51968b89368a3c0371ea2c9a AS mise-tools
-COPY --from=ghcr.io/jdx/mise:2026.10.25@sha256:91417f41840316b7c5da6854bef393eccea4546ae70f8baf0803e0e94287b68d /usr/local/bin/mise /usr/local/bin/mise
+FROM alpine:3.24@sha256:3f4d6b32e26703c6082839234f43769d5046b3ac7c910033911d1e71d8cd630a AS mise-tools
+COPY --from=ghcr.io/jdx/mise:2026.11.3@sha256:60a4852b1632aebb032c94bfbaf8196a1088c091bfd6cfa1ce8f182ab39c7d8e /usr/local/bin/mise /usr/local/bin/mise
 # ca-certificates 的版本随 digest 锁定的 alpine 基础镜像走，无需单独 pin
 # hadolint ignore=DL3018
 RUN apk add --no-cache ca-certificates
