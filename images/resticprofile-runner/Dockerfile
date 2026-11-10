@@ -5,8 +5,8 @@
 # 安装并校验，最终镜像只接收静态二进制，mise 本体不进入镜像。
 # rclone 使用上游镜像自带版本，不由 mise 覆盖。
 # 消费方：services 仓库的 edge/resticprofile 与 stump/backup-ops。
-FROM alpine:3.24@sha256:be2656061b536c1883c4034790e21d0a09c5aaaf51968b89368a3c0371ea2c9a AS mise-tools
-COPY --from=ghcr.io/jdx/mise:2026.11.0@sha256:6e05da4113a812cc8ac72b21a38889d019fb0f97df6ce8075c0de98d1cf48cc4 /usr/local/bin/mise /usr/local/bin/mise
+FROM alpine:3.24@sha256:f59abe656b692d901e184be3445e084786602108599d2a51d229c0f5a48c71bf AS mise-tools
+COPY --from=ghcr.io/jdx/mise:2026.11.6@sha256:d4de1845114f6d73e90e15f7642885f74f3ca93074491038a2b9c43e4b897f21 /usr/local/bin/mise /usr/local/bin/mise
 # ca-certificates 的版本随 digest 锁定的 alpine 基础镜像走，无需单独 pin
 # hadolint ignore=DL3018
 RUN apk add --no-cache ca-certificates
@@ -22,7 +22,7 @@ RUN mise trust \
     && cp "$(mise which supercronic)" /out/supercronic \
     && cp "$(mise which jq)" /out/jq
 
-FROM creativeprojects/resticprofile:0.33.1@sha256:11ecefbac151a2e9c2929a0190fde91f5f750f6c3a3f529dd708043d51d92414 AS final
+FROM creativeprojects/resticprofile:0.33.1@sha256:b919f7ae7adfa4b0900ac87ab5314fb88229698b0a8d38ebc3882a27ac9e73d1 AS final
 
 COPY --from=mise-tools /out/supercronic /usr/local/bin/supercronic
 COPY --from=mise-tools /out/jq /usr/local/bin/jq
