@@ -7,7 +7,7 @@
 # 一个镜像两个角色：postgres 主服务本体（官方 ENTRYPOINT 不变）与
 # pgbackrest sidecar（entrypoint 覆盖为 supercronic）。
 # 消费方：services 仓库的 edge/postgres。
-FROM postgres:18.6@sha256:e3d24f6906d0760bf4da0dae872415391ededefad23fd471c47dc53b0ddf3c42 AS base
+FROM postgres:18.7@sha256:9f4fd4aa918f52ae3d6f3b687f1de90d8f867cd4d520021545a9a50c120eae3b AS base
 
 # pgdg 源：手动导入签名 key 并写入 sources.list（与已验证的 barman 镜像同模式）；
 # postgres:18.6 基础镜像不含 curl/gnupg，需先安装。
@@ -26,7 +26,7 @@ RUN apt-get update \
     && rm -rf /var/lib/apt/lists/*
 
 FROM alpine:3.24@sha256:f59abe656b692d901e184be3445e084786602108599d2a51d229c0f5a48c71bf AS mise-tools
-COPY --from=ghcr.io/jdx/mise:2026.11.6@sha256:d4de1845114f6d73e90e15f7642885f74f3ca93074491038a2b9c43e4b897f21 /usr/local/bin/mise /usr/local/bin/mise
+COPY --from=ghcr.io/jdx/mise:2026.11.8@sha256:5c6e71a86c8c997c32d30a169b4269bec9d4681a804e29078bac8f44109f2edc /usr/local/bin/mise /usr/local/bin/mise
 # ca-certificates 的版本随 digest 锁定的 alpine 基础镜像走，无需单独 pin
 # hadolint ignore=DL3018
 RUN apk add --no-cache ca-certificates
