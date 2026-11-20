@@ -7,7 +7,7 @@
 # 一个镜像两个角色：postgres 主服务本体（官方 ENTRYPOINT 不变）与
 # pgbackrest sidecar（entrypoint 覆盖为 supercronic）。
 # 消费方：services 仓库的 edge/postgres。
-FROM postgres:18.7@sha256:2ea8630df176ad090ec92136dee850397c5af8781e4bcf2e4162593691c61bbc AS base
+FROM postgres:19.0@sha256:bb6e70add742cd868fb62cb3b2f67d1dd2bdd2b65a521e778420748753687c60 AS base
 
 # pgdg 源：手动导入签名 key 并写入 sources.list（与已验证的 barman 镜像同模式）；
 # postgres:18.6 基础镜像不含 curl/gnupg，需先安装。
