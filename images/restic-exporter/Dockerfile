@@ -4,7 +4,7 @@
 # 最终镜像只接收一个静态二进制，mise 本体不进入镜像。
 # 消费方：services 仓库的 stump/backup-ops。
 FROM alpine:3.24@sha256:f59abe656b692d901e184be3445e084786602108599d2a51d229c0f5a48c71bf AS mise-tools
-COPY --from=ghcr.io/jdx/mise:2026.11.9@sha256:9a182adba2584a6f5b29ddc1f2c7651c93694a5f829d74452b90214616baacf4 /usr/local/bin/mise /usr/local/bin/mise
+COPY --from=ghcr.io/jdx/mise:2026.11.14@sha256:7178a0bc7eb30d5090f81237fc0a7830f57e52126b9d8df656e24547437a1e53 /usr/local/bin/mise /usr/local/bin/mise
 # ca-certificates 的版本随 digest 锁定的 alpine 基础镜像走，无需单独 pin
 # hadolint ignore=DL3018
 RUN apk add --no-cache ca-certificates
